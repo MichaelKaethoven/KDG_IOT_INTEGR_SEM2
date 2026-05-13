@@ -32,37 +32,33 @@ def _push_to_webhook(data: list) -> None:
         print(f"[push] webhook error: {e}")
 
 
-def _push_to_influxdb(data: list) -> None:
-    influx_url = os.environ.get("INFLUXDB_URL")
-    if not influx_url:
+def _push_to_supabase(data: list) -> None:
+    supabase_url = os.environ.get("SUPABASE_URL")
+    if not supabase_url:
         return
     try:
-        from influxdb_client import InfluxDBClient, Point, WritePrecision
-        from influxdb_client.client.write_api import SYNCHRONOUS
+        from supabase import create_client
 
-        token  = os.environ["INFLUXDB_TOKEN"]
-        org    = os.environ["INFLUXDB_ORG"]
-        bucket = os.environ["INFLUXDB_BUCKET"]
+        key = os.environ["SUPABASE_KEY"]
+        client = create_client(supabase_url, key)
 
-        with InfluxDBClient(url=influx_url, token=token, org=org) as client:
-            write_api = client.write_api(write_options=SYNCHRONOUS)
-            points = [
-                Point("device_location")
-                .tag("device_name", d["device_name"])
-                .field("latitude",  d["lat"])
-                .field("longitude", d["lon"])
-                .field("altitude",  d.get("altitude") or 0.0)
-                .field("accuracy",  d.get("accuracy") or 0.0)
-                for d in data if d["lat"] is not None and d["lon"] is not None
-            ]
-            if points:
-                write_api.write(bucket=bucket, org=org, record=points,
-                                precision=WritePrecision.SECONDS)
-                print(f"[influx] wrote {len(points)} point(s)")
+        rows = [
+            {
+                "device_name": d["device_name"],
+                "lat":         d["lat"],
+                "lon":         d["lon"],
+                "altitude":    d.get("altitude") or 0.0,
+                "accuracy":    d.get("accuracy") or 0.0,
+            }
+            for d in data if d["lat"] is not None and d["lon"] is not None
+        ]
+        if rows:
+            client.table("device_locations").insert(rows).execute()
+            print(f"[supabase] inserted {len(rows)} row(s)")
     except ImportError:
-        print("[influx] influxdb-client not installed — skipping")
+        print("[supabase] supabase-py not installed — skipping")
     except Exception as e:
-        print(f"[influx] error: {e}")
+        print(f"[supabase] error: {e}")
 
 
 def polling_loop() -> None:
@@ -76,7 +72,7 @@ def polling_loop() -> None:
                 _last_poll = time.time()
             print(f"[poll] got {len(data)} location record(s)")
             _push_to_webhook(data)
-            _push_to_influxdb(data)
+            _push_to_supabase(data)
         except Exception as e:
             print(f"[poll] error: {e}")
         time.sleep(POLL_INTERVAL)

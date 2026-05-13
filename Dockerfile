@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
- && pip install --no-cache-dir flask influxdb-client
+ && pip install --no-cache-dir flask supabase
 
 COPY . .
 
@@ -19,10 +19,8 @@ VOLUME ["/app/Auth"]
 ENV PUSH_URL=""
 ENV POLL_INTERVAL=300
 ENV PORT=5500
-ENV INFLUXDB_URL=""
-ENV INFLUXDB_TOKEN=""
-ENV INFLUXDB_ORG=""
-ENV INFLUXDB_BUCKET="find_hub"
+ENV SUPABASE_URL=""
+ENV SUPABASE_KEY=""
 
 EXPOSE 5500
 
