@@ -1,0 +1,18 @@
+[Unit]
+Description=Google Find Hub Location Polling Middleware
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=findhub
+WorkingDirectory=/opt/findhub
+EnvironmentFile=/opt/findhub/.env
+ExecStart=/opt/findhub/venv/bin/python middleware.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
