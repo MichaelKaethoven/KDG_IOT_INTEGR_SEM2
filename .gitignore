@@ -6,9 +6,15 @@ __pycache__/
 *.pyd
 
 # Credentials — never commit
-Auth/secrets.json
+libs/Auth/secrets.json
 .env
 
 # OS
 .DS_Store
 Thumbs.db
+
+# ESP-IDF build output
+esp/ESP32Firmware/build/
+esp/ESP32Firmware/sdkconfig
+esp/ESP32Firmware/dependencies.lock
+esp/ESP32Firmware/managed_components/

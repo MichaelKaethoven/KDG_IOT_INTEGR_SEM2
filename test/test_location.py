@@ -1,5 +1,9 @@
 import sys
-sys.path.insert(0, '.')
+import os
+
+_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+sys.path.insert(0, os.path.join(_root, 'libs'))
+sys.path.insert(0, os.path.join(_root, 'runtime'))
 
 from location_fetcher import fetch_device_list, fetch_locations_for_device
 

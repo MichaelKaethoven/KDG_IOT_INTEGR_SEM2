@@ -1,5 +1,8 @@
 import sys
-sys.path.insert(0, '.')
+import os
+
+_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+sys.path.insert(0, os.path.join(_root, 'libs'))
 
 from NovaApi.ListDevices.nbe_list_devices import request_device_list
 from ProtoDecoders.decoder import parse_device_list_protobuf, get_canonic_ids

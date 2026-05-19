@@ -1,35 +1,24 @@
 import sys
-sys.path.insert(0, '.')
-
 import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'libs'))
+
 import time
 import threading
 import argparse
 
-import requests
 from flask import Flask, jsonify
 
 from location_fetcher import fetch_all_locations
 
 app = Flask(__name__)
 
-PUSH_URL = os.environ.get("PUSH_URL", "")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 300))
 PORT = int(os.environ.get("PORT", 5500))
 
 _cache: list = []
 _cache_lock = threading.Lock()
 _last_poll: float = 0.0
-
-
-def _push_to_webhook(data: list) -> None:
-    if not PUSH_URL:
-        return
-    try:
-        resp = requests.post(PUSH_URL, json=data, timeout=10)
-        resp.raise_for_status()
-    except Exception as e:
-        print(f"[push] webhook error: {e}")
 
 
 def _push_to_supabase(data: list) -> None:
@@ -49,12 +38,13 @@ def _push_to_supabase(data: list) -> None:
                 "lon":         d["lon"],
                 "altitude":    d.get("altitude") or 0.0,
                 "accuracy":    d.get("accuracy") or 0.0,
+                "time":        d.get("time"),
             }
             for d in data if d["lat"] is not None and d["lon"] is not None
         ]
         if rows:
-            client.table("device_locations").insert(rows).execute()
-            print(f"[supabase] inserted {len(rows)} row(s)")
+            client.table("device_locations").upsert(rows, on_conflict="device_name,time").execute()
+            print(f"[supabase] upserted {len(rows)} row(s)")
     except ImportError:
         print("[supabase] supabase-py not installed — skipping")
     except Exception as e:
@@ -71,7 +61,6 @@ def polling_loop() -> None:
                 _cache = data
                 _last_poll = time.time()
             print(f"[poll] got {len(data)} location record(s)")
-            _push_to_webhook(data)
             _push_to_supabase(data)
         except Exception as e:
             print(f"[poll] error: {e}")
@@ -94,12 +83,10 @@ def healthz():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--push-url",  default=PUSH_URL)
     parser.add_argument("--interval",  type=int, default=POLL_INTERVAL)
     parser.add_argument("--port",      type=int, default=PORT)
     args = parser.parse_args()
 
-    PUSH_URL      = args.push_url
     POLL_INTERVAL = args.interval
     PORT          = args.port
 
