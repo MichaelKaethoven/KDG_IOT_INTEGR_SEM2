@@ -8,8 +8,9 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'libs'))
 
-from SpotApi.CreateBleDevice.create_ble_device import register_esp32
+
+from NovaApi.ListDevices.nbe_list_devices import list_devices
 
 if __name__ == '__main__':
 
-    register_esp32()
+    list_devices()

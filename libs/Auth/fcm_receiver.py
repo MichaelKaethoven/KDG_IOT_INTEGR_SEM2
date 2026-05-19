@@ -130,11 +130,16 @@ class FcmReceiver:
         self._loop_thread = threading.Thread(target=self._run_event_loop_in_thread, daemon=True)
         self._loop_thread.start()
 
-        # Register for FCM first (blocking)
-        temp_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(temp_loop)
-        temp_loop.run_until_complete(self._register_for_fcm())
-        temp_loop.close()
+        if self.credentials is None:
+            # No cached credentials — full GCM registration needed
+            temp_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(temp_loop)
+            temp_loop.run_until_complete(self._register_for_fcm())
+            temp_loop.close()
+        else:
+            # Cached credentials available — skip GCM check-in and use them directly
+            self.pc.credentials = self.credentials
+            print("[FCMReceiver] Using cached credentials, skipping GCM check-in.")
 
         # Now start the listener in the background loop
         asyncio.run_coroutine_threadsafe(self.pc.start(), self._loop)

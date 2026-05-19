@@ -24,8 +24,12 @@ def create_device_list_request():
     return binascii.hexlify(binary_payload).decode('utf-8')
 
 
-if __name__ == '__main__':
+def list_devices():
     result_hex = request_device_list()
     device_list = parse_device_list_protobuf(result_hex)
     for name, canonic_id in get_canonic_ids(device_list):
         print(f"{name}: {canonic_id}")
+
+
+if __name__ == '__main__':
+    list_devices()

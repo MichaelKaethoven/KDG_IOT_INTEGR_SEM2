@@ -1,0 +1,30 @@
+services:
+  middleware:
+    build: .
+    command: python runtime/middleware.py
+    ports:
+      - "5500:5500"
+    volumes:
+      - ./libs/Auth:/app/libs/Auth
+    environment:
+      - POLL_INTERVAL=${POLL_INTERVAL:-300}
+      - PORT=5500
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT:-8883}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - MQTT_TOPIC=${MQTT_TOPIC:-findmy/devices}
+
+  subscriber:
+    build: .
+    command: python runtime/subscriber.py
+    depends_on:
+      - middleware
+    environment:
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT:-8883}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - MQTT_TOPIC=${MQTT_TOPIC:-findmy/devices}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}

@@ -52,5 +52,8 @@ def set_cached_value(name: str, value: str):
 
 
 def _get_secrets_file():
+    custom = os.environ.get('SECRETS_PATH')
+    if custom:
+        return custom
     script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, SECRETS_FILE)

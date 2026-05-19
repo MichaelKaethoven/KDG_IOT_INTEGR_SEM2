@@ -1,0 +1,43 @@
+# fly.toml app configuration file generated for findmy-middleware-dappled-silence-7211 on 2026-05-19T13:50:41+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'findmy-middleware-dappled-silence-7211'
+primary_region = 'ams'
+
+[build]
+
+[processes]
+  middleware = 'python runtime/middleware.py'
+  subscriber = 'python runtime/subscriber.py'
+
+[[mounts]]
+  source = 'auth_data'
+  destination = '/app/auth_data'
+  processes = ['middleware']
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 5500
+  processes = ['middleware']
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+  [[services.http_checks]]
+    interval = '1m0s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/healthz'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
