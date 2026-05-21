@@ -1,0 +1,32 @@
+body {
+  background-color: #f8f9fa;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+.table th {
+  white-space: nowrap;
+}
+
+.progress {
+  border-radius: 4px;
+}
+
+.font-monospace {
+  font-size: .875em;
+}
+
+.card {
+  border: none;
+}
+
+.card .table {
+  margin-bottom: 0;
+}
+
+iframe {
+  min-height: 480px;
+}

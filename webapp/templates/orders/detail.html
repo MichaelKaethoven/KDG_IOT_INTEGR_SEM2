@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.id[:8] }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{{ url_for('orders.list_orders') }}">Orders</a></li>
+      <li class="breadcrumb-item active">{{ order.id[:8] }}…</li>
+    </ol>
+  </nav>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Order info -->
+  <div class="col-md-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="card-title text-muted">Order details</h6>
+        <dl class="row mb-0">
+          <dt class="col-5">Customer</dt>
+          <dd class="col-7">
+            <a href="{{ url_for('customers.customer_detail', customer_id=order.customer.id) }}">
+              {{ order.customer.name }}
+            </a>
+          </dd>
+          <dt class="col-5">Date</dt>
+          <dd class="col-7">{{ order.order_date[:10] }}</dd>
+          <dt class="col-5">Status</dt>
+          <dd class="col-7">
+            <span class="badge
+              {% if order.status == 'active' %}bg-success
+              {% elif order.status == 'pending' %}bg-warning text-dark
+              {% elif order.status == 'completed' %}bg-secondary
+              {% else %}bg-danger{% endif %}">
+              {{ order.status }}
+            </span>
+          </dd>
+          <dt class="col-5">Notes</dt>
+          <dd class="col-7">{{ order.notes or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fulfillment -->
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body d-flex flex-column align-items-center justify-content-center text-center">
+        <div class="display-5 fw-bold">{{ fulfilled }}/{{ order.quantity }}</div>
+        <div class="text-muted mb-2">Trackers assigned</div>
+        <div class="progress w-100" style="height:8px">
+          <div class="progress-bar bg-success"
+               style="width:{{ [fulfilled / order.quantity * 100, 100] | min }}%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit form (admin) -->
+  {% if session.role == 'admin' %}
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="card-title text-muted">Edit order</h6>
+        <form method="post" action="{{ url_for('orders.edit_order', order_id=order.id) }}">
+          <div class="mb-2">
+            <label class="form-label form-label-sm">Status</label>
+            <select name="status" class="form-select form-select-sm">
+              {% for s in statuses %}
+                <option value="{{ s }}" {% if order.status == s %}selected{% endif %}>{{ s | capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label form-label-sm">Quantity</label>
+            <input type="number" name="quantity" class="form-control form-control-sm"
+                   value="{{ order.quantity }}" min="1" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label form-label-sm">Notes</label>
+            <input type="text" name="notes" class="form-control form-control-sm"
+                   value="{{ order.notes or '' }}">
+          </div>
+          <button class="btn btn-sm btn-dark">Save changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Assigned trackers -->
+<div class="d-flex align-items-center mb-2">
+  <h6 class="mb-0">Assigned trackers</h6>
+  <a href="{{ url_for('dashboard.index') }}?order={{ order.id }}"
+     class="btn btn-sm btn-outline-primary ms-auto">
+    <i class="bi bi-map"></i> View on map
+  </a>
+</div>
+<div class="card shadow-sm mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-dark">
+        <tr><th>Device name</th><th>Serial</th><th>Last seen</th><th>Last location</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in assignments %}
+        <tr>
+          <td>{{ a.tracker.device_name }}</td>
+          <td>{{ a.tracker.serial_number or '—' }}</td>
+          <td>{{ a.last_location.time[:19].replace('T',' ') if a.last_location else '—' }}</td>
+          <td>
+            {% if a.last_location %}
+              {{ '%.5f' | format(a.last_location.lat) }}, {{ '%.5f' | format(a.last_location.lon) }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            {% if session.role == 'admin' %}
+              <form method="post"
+                    action="{{ url_for('orders.remove_tracker', order_id=order.id, tracker_id=a.tracker_id) }}"
+                    onsubmit="return confirm('Remove tracker from this order?')">
+                <button class="btn btn-sm btn-outline-danger">Remove</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted text-center py-3">No trackers assigned yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if session.role == 'admin' and available_trackers %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h6 class="card-title">Assign a tracker</h6>
+    <form method="post" action="{{ url_for('orders.assign_tracker', order_id=order.id) }}"
+          class="d-flex gap-2">
+      <select name="tracker_id" class="form-select form-select-sm" style="max-width:300px" required>
+        <option value="">Select available tracker…</option>
+        {% for t in available_trackers %}
+          <option value="{{ t.id }}">{{ t.device_name }}{% if t.serial_number %} ({{ t.serial_number }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm btn-dark">Assign</button>
+    </form>
+  </div>
+</div>
+{% elif session.role == 'admin' %}
+<p class="text-muted"><i class="bi bi-info-circle"></i> No available trackers. Add trackers in the
+  <a href="{{ url_for('trackers.list_trackers') }}">Trackers</a> section.
+</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,143 @@
+{
+  "id": null,
+  "uid": "tracker-locations",
+  "title": "Tracker Dashboard",
+  "tags": ["trackers", "findmy"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "customer",
+        "label": "Customer",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+        "query": "SELECT 'all' __text, 'all' __value UNION ALL SELECT name __text, id::text __value FROM customers ORDER BY 1",
+        "definition": "SELECT 'all' __text, 'all' __value UNION ALL SELECT name __text, id::text __value FROM customers ORDER BY 1",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "hide": 0,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "order_var",
+        "label": "Order",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+        "query": "SELECT 'all' __text, 'all' __value UNION ALL SELECT CONCAT(c.name, ' — ', LEFT(o.id::text,8)) __text, o.id::text __value FROM orders o JOIN customers c ON c.id = o.customer_id WHERE '${customer}' = 'all' OR o.customer_id::text = '${customer}' ORDER BY 1",
+        "definition": "SELECT 'all' __text, 'all' __value UNION ALL SELECT CONCAT(c.name, ' — ', LEFT(o.id::text,8)) __text, o.id::text __value FROM orders o JOIN customers c ON c.id = o.customer_id WHERE '${customer}' = 'all' OR o.customer_id::text = '${customer}' ORDER BY 1",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "hide": 0,
+        "current": {},
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "geomap",
+      "title": "Tracker Locations",
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "view": { "id": "fit", "lat": 50.8, "lon": 4.4, "zoom": 7 },
+        "controls": { "showZoom": true, "mouseWheelZoom": true, "showAttribution": true },
+        "basemap": { "type": "default", "name": "Layer 0", "config": {} },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Trackers",
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": { "fixed": "dark-green" },
+                "opacity": 0.8,
+                "size": { "fixed": 8, "min": 5, "max": 15 },
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" }
+              }
+            },
+            "location": { "mode": "coords", "latitude": "lat", "longitude": "lon" },
+            "tooltip": true,
+            "filterData": { "id": "byRefId", "options": "A" }
+          }
+        ],
+        "tooltip": { "mode": "details" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  c.name AS customer_name,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\nORDER BY dl.device_name, dl.time DESC"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Tracker Details",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 14 },
+      "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "order_status" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "active":    { "color": "green",  "index": 0 } } },
+                  { "type": "value", "options": { "pending":   { "color": "yellow", "index": 1 } } },
+                  { "type": "value", "options": { "completed": { "color": "blue",   "index": 2 } } },
+                  { "type": "value", "options": { "cancelled": { "color": "red",    "index": 3 } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": { "show": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.time AS last_seen,\n  ROUND(dl.lat::numeric, 5) AS lat,\n  ROUND(dl.lon::numeric, 5) AS lon,\n  c.name AS customer,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\nORDER BY dl.device_name, dl.time DESC"
+        }
+      ]
+    }
+  ],
+  "annotations": { "list": [] },
+  "links": [],
+  "editable": true,
+  "graphTooltip": 0
+}

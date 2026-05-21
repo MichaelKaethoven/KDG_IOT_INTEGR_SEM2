@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Trackers{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Trackers</h5>
+  {% if session.role == 'admin' %}
+    <a href="{{ url_for('trackers.new_tracker') }}" class="btn btn-sm btn-dark ms-auto">
+      <i class="bi bi-plus-lg"></i> Add Tracker
+    </a>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Device name</th><th>Serial</th><th>Notes</th>
+          <th>Status</th><th>Customer / Order</th><th>Last seen</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trackers %}
+        <tr>
+          <td class="font-monospace">{{ t.device_name }}</td>
+          <td>{{ t.serial_number or '—' }}</td>
+          <td>{{ t.notes or '—' }}</td>
+          <td>
+            {% if t.assignment %}
+              <span class="badge bg-success">Assigned</span>
+            {% else %}
+              <span class="badge bg-secondary">Available</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.assignment %}
+              <a href="{{ url_for('customers.customer_detail', customer_id=t.assignment.customer.id) }}">
+                {{ t.assignment.customer.name }}</a>
+              /
+              <a href="{{ url_for('orders.order_detail', order_id=t.assignment.id) }}">
+                {{ t.assignment.id[:8] }}…</a>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ t.last_seen[:19].replace('T',' ') if t.last_seen else '—' }}</td>
+          <td class="text-end">
+            {% if session.role == 'admin' %}
+              <a href="{{ url_for('trackers.edit_tracker', tracker_id=t.id) }}"
+                 class="btn btn-sm btn-outline-secondary">Edit</a>
+              <form method="post" action="{{ url_for('trackers.delete_tracker', tracker_id=t.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Delete {{ t.device_name }}?')">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted text-center py-3">No trackers in inventory.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

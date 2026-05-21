@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{% if customer %}Edit Customer{% else %}New Customer{% endif %}{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('customers.list_customers') }}">Customers</a></li>
+      {% if customer %}
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('customers.customer_detail', customer_id=customer.id) }}">{{ customer.name }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active">{% if customer %}Edit{% else %}New{% endif %}</li>
+    </ol>
+  </nav>
+</div>
+
+<div class="card shadow-sm" style="max-width:480px">
+  <div class="card-body">
+    <h5 class="card-title">{% if customer %}Edit Customer{% else %}New Customer{% endif %}</h5>
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Name <span class="text-danger">*</span></label>
+        <input type="text" name="name" class="form-control" value="{{ customer.name if customer else '' }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" value="{{ customer.email if customer else '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Phone</label>
+        <input type="tel" name="phone" class="form-control" value="{{ customer.phone if customer else '' }}">
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark">Save</button>
+        <a href="{{ url_for('customers.list_customers') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

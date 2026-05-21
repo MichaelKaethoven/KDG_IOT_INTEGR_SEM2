@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <h5 class="mb-0"><i class="bi bi-box-seam"></i> Orders</h5>
+  {% if session.role == 'admin' %}
+    <a href="{{ url_for('orders.new_order') }}" class="btn btn-sm btn-dark ms-auto">
+      <i class="bi bi-plus-lg"></i> New Order
+    </a>
+  {% endif %}
+</div>
+
+<form class="d-flex gap-2 mb-3 flex-wrap" method="get">
+  <select name="customer" class="form-select form-select-sm" style="width:auto">
+    <option value="" {% if not selected_customer %}selected{% endif %}>All customers</option>
+    {% for c in customers %}
+      <option value="{{ c.id }}" {% if selected_customer == c.id %}selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" class="form-select form-select-sm" style="width:auto">
+    <option value="" {% if not selected_status %}selected{% endif %}>All statuses</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s | capitalize }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn-sm btn-outline-secondary">Filter</button>
+</form>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Order ID</th><th>Customer</th><th>Date</th><th>Status</th>
+          <th>Qty</th><th>Assigned</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td><a href="{{ url_for('orders.order_detail', order_id=o.id) }}">{{ o.id[:8] }}…</a></td>
+          <td>
+            <a href="{{ url_for('customers.customer_detail', customer_id=o.customer.id) }}">
+              {{ o.customer.name }}
+            </a>
+          </td>
+          <td>{{ o.order_date[:10] }}</td>
+          <td>
+            <span class="badge
+              {% if o.status == 'active' %}bg-success
+              {% elif o.status == 'pending' %}bg-warning text-dark
+              {% elif o.status == 'completed' %}bg-secondary
+              {% else %}bg-danger{% endif %}">
+              {{ o.status }}
+            </span>
+          </td>
+          <td>{{ o.quantity }}</td>
+          <td>
+            <div class="progress" style="height:6px;width:80px">
+              <div class="progress-bar bg-success"
+                   style="width:{{ [o.assigned_count / o.quantity * 100, 100] | min }}%"></div>
+            </div>
+            <small>{{ o.assigned_count }}/{{ o.quantity }}</small>
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('orders.order_detail', order_id=o.id) }}"
+               class="btn btn-sm btn-outline-secondary">View</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted text-center py-3">No orders found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
