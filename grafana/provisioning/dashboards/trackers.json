@@ -6,10 +6,21 @@
   "timezone": "browser",
   "refresh": "1m",
   "schemaVersion": 39,
-  "version": 2,
-  "time": { "from": "now-6h", "to": "now" },
+  "version": 4,
+  "time": { "from": "now-24h", "to": "now" },
   "templating": {
     "list": [
+      {
+        "name": "view",
+        "type": "custom",
+        "hide": 2,
+        "current": { "value": "current", "text": "current" },
+        "options": [
+          { "selected": true,  "text": "current",    "value": "current" },
+          { "selected": false, "text": "historical",  "value": "historical" }
+        ],
+        "query": "current,historical"
+      },
       {
         "name": "customer",
         "label": "Customer",
@@ -64,7 +75,14 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red",   "value": 24 }
+            ]
+          },
+          "noValue": " ",
           "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
         },
         "overrides": []
@@ -80,7 +98,7 @@
             "config": {
               "showLegend": true,
               "style": {
-                "color": { "fixed": "dark-green" },
+                "color": { "mode": "field", "field": "hours_since_seen" },
                 "opacity": 0.8,
                 "size": { "fixed": 8, "min": 5, "max": 15 },
                 "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" }
@@ -99,7 +117,7 @@
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  c.name AS customer_name,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\nORDER BY dl.device_name, dl.time DESC"
+          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n  c.name AS customer_name,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'current'\nORDER BY dl.device_name, dl.time DESC"
         }
       ]
     },
@@ -111,16 +129,14 @@
       "datasource": { "type": "postgres", "uid": "supabase-postgres" },
       "fieldConfig": {
         "defaults": {
+          "noValue": " ",
           "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true }
         },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "order_status" },
             "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": { "type": "color-background", "mode": "gradient" }
-              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
               {
                 "id": "mappings",
                 "value": [
@@ -131,21 +147,35 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "hours_since_seen" },
+            "properties": [
+              { "id": "displayName", "value": "Hours Since Seen" },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "red",   "value": 24 }
+                  ]
+                }
+              },
+              { "id": "color", "value": { "mode": "thresholds" } }
+            ]
           }
         ]
       },
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": { "show": false }
-      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.time AS last_seen,\n  ROUND(dl.lat::numeric, 5) AS lat,\n  ROUND(dl.lon::numeric, 5) AS lon,\n  c.name AS customer,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\nORDER BY dl.device_name, dl.time DESC"
+          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.time AS last_seen,\n  ROUND(dl.lat::numeric, 5) AS lat,\n  ROUND(dl.lon::numeric, 5) AS lon,\n  ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n  c.name AS customer,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'current'\nORDER BY dl.device_name, dl.time DESC"
         }
       ]
     },
@@ -159,6 +189,7 @@
         "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "noValue": " ",
           "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
         },
         "overrides": []
@@ -172,11 +203,7 @@
             "type": "route",
             "name": "Path",
             "config": {
-              "style": {
-                "color": { "fixed": "blue" },
-                "lineWidth": 2,
-                "opacity": 0.6
-              }
+              "style": { "color": { "fixed": "blue" }, "lineWidth": 2, "opacity": 0.6 }
             },
             "location": { "mode": "coords", "latitude": "lat", "longitude": "lon" },
             "tooltip": true,
@@ -207,7 +234,7 @@
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT\n  dl.time,\n  dl.lat,\n  dl.lon,\n  dl.device_name\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND $__timeFilter(dl.time)\nORDER BY dl.time ASC"
+          "rawSql": "SELECT\n  dl.time,\n  dl.lat,\n  dl.lon,\n  dl.device_name\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'historical'\n  AND $__timeFilter(dl.time)\nORDER BY dl.time ASC"
         }
       ]
     },
@@ -219,6 +246,7 @@
       "datasource": { "type": "postgres", "uid": "supabase-postgres" },
       "fieldConfig": {
         "defaults": {
+          "noValue": " ",
           "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true }
         },
         "overrides": [
@@ -231,9 +259,7 @@
           },
           {
             "matcher": { "id": "byName", "options": "device_name" },
-            "properties": [
-              { "id": "displayName", "value": "Tracker" }
-            ]
+            "properties": [{ "id": "displayName", "value": "Tracker" }]
           }
         ]
       },
@@ -249,7 +275,7 @@
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT\n  dl.time,\n  dl.device_name,\n  ROUND(dl.lat::numeric, 5) AS lat,\n  ROUND(dl.lon::numeric, 5) AS lon\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND $__timeFilter(dl.time)\nORDER BY dl.time DESC"
+          "rawSql": "SELECT\n  dl.time,\n  dl.device_name,\n  ROUND(dl.lat::numeric, 5) AS lat,\n  ROUND(dl.lon::numeric, 5) AS lon\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'historical'\n  AND $__timeFilter(dl.time)\nORDER BY dl.time DESC"
         }
       ]
     }
