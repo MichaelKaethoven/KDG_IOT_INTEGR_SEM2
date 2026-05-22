@@ -30,3 +30,16 @@ body {
 iframe {
   min-height: 480px;
 }
+
+.dashboard-toolbar .filter-control {
+  width: 220px;
+}
+
+.dashboard-toolbar .input-group-text {
+  background-color: #fff;
+}
+
+.dashboard-frame iframe {
+  height: calc(100vh - 200px);
+  min-height: 520px;
+}
