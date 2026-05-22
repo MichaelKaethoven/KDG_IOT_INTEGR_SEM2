@@ -19,6 +19,7 @@
   <div class="card-body">
     <h5 class="card-title">{% if customer %}Edit Customer{% else %}New Customer{% endif %}</h5>
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
         <label class="form-label">Name <span class="text-danger">*</span></label>
         <input type="text" name="name" class="form-control" value="{{ customer.name if customer else '' }}" required>

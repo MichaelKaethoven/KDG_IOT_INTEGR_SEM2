@@ -63,6 +63,7 @@
       <div class="card-body">
         <h6 class="card-title text-muted">Edit order</h6>
         <form method="post" action="{{ url_for('orders.edit_order', order_id=order.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-2">
             <label class="form-label form-label-sm">Status</label>
             <select name="status" class="form-select form-select-sm">
@@ -119,6 +120,7 @@
               <form method="post"
                     action="{{ url_for('orders.remove_tracker', order_id=order.id, tracker_id=a.tracker_id) }}"
                     onsubmit="return confirm('Remove tracker from this order?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-danger">Remove</button>
               </form>
             {% endif %}
@@ -138,6 +140,7 @@
     <h6 class="card-title">Assign a tracker</h6>
     <form method="post" action="{{ url_for('orders.assign_tracker', order_id=order.id) }}"
           class="d-flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <select name="tracker_id" class="form-select form-select-sm" style="max-width:300px" required>
         <option value="">Select available tracker…</option>
         {% for t in available_trackers %}

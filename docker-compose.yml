@@ -39,8 +39,8 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SECRET_KEY=${SECRET_KEY}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - USER_PASSWORD=${USER_PASSWORD}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
+      - USER_PASSWORD_HASH=${USER_PASSWORD_HASH}
       - WEBAPP_PORT=${WEBAPP_PORT:-8080}
       - GRAFANA_URL=${GRAFANA_URL:-http://localhost:3000}
     depends_on:
@@ -55,10 +55,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
     environment:
       - GF_SECURITY_ALLOW_EMBEDDING=true
-      - GF_SECURITY_CONTENT_SECURITY_POLICY=false
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - SUPABASE_DB_HOST=${SUPABASE_DB_HOST}
       - SUPABASE_DB_USER=${SUPABASE_DB_USER}

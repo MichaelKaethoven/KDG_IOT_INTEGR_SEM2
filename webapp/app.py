@@ -4,12 +4,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask
+from extensions import csrf, limiter
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ["SECRET_KEY"]
-    app.config["GRAFANA_URL"] = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+    app.config["GRAFANA_URL"] = os.environ.get("GRAFANA_URL", "http://localhost:3001")
+
+    csrf.init_app(app)
+    limiter.init_app(app)
 
     from blueprints.auth import auth_bp
     from blueprints.dashboard import dashboard_bp

@@ -13,6 +13,9 @@ libs/Auth/secrets.json
 .DS_Store
 Thumbs.db
 
+# Local dev notes
+development_plan.md
+
 # ESP-IDF build output
 esp/ESP32Firmware/build/
 esp/ESP32Firmware/sdkconfig
