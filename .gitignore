@@ -15,6 +15,7 @@ Thumbs.db
 
 # Local dev notes
 development_plan.md
+CLAUDE.md
 
 # ESP-IDF build output
 esp/ESP32Firmware/build/
