@@ -56,9 +56,10 @@
           </td>
           <td>{{ o.quantity }}</td>
           <td>
+            {% set pct = (o.assigned_count / o.quantity * 100) if o.quantity > 0 else 0 %}
             <div class="progress" style="height:6px;width:80px">
               <div class="progress-bar bg-success"
-                   style="width:{{ [o.assigned_count / o.quantity * 100, 100] | min }}%"></div>
+                   style="width:{{ [pct, 100] | min }}%"></div>
             </div>
             <small>{{ o.assigned_count }}/{{ o.quantity }}</small>
           </td>

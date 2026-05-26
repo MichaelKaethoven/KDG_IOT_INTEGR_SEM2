@@ -1,11 +1,7 @@
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'libs'))
-
 import hashlib
-import time
+import threading
 import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
 
 from Auth.fcm_receiver import FcmReceiver
@@ -31,6 +27,7 @@ def fetch_device_list() -> List[tuple]:
 def fetch_locations_for_device(canonic_id: str, name: str, timeout: int = 30) -> List[Dict]:
     """Fetches and decrypts locations for a single device. Returns list of location dicts."""
     result = None
+    done = threading.Event()
     request_uuid = generate_random_uuid()
 
     def handle_response(response):
@@ -38,14 +35,13 @@ def fetch_locations_for_device(canonic_id: str, name: str, timeout: int = 30) ->
         device_update = parse_device_update_protobuf(response)
         if device_update.fcmMetadata.requestUuid == request_uuid:
             result = device_update
+            done.set()
 
     fcm_token = FcmReceiver().register_for_location_updates(handle_response)
     hex_payload = create_location_request(canonic_id, fcm_token, request_uuid)
     nova_request(NOVA_ACTION_API_SCOPE, hex_payload)
 
-    deadline = time.time() + timeout
-    while result is None and time.time() < deadline:
-        time.sleep(0.1)
+    done.wait(timeout=timeout)
 
     if result is None:
         print(f"[fetch] timeout waiting for location response for {name}")
@@ -80,7 +76,7 @@ def _decrypt_to_dicts(device_update_protobuf, name: str) -> List[Dict]:
                 'lon': None,
                 'altitude': None,
                 'accuracy': None,
-                'time': datetime.datetime.utcfromtimestamp(ts.seconds).isoformat() + 'Z',
+                'time': datetime.datetime.fromtimestamp(ts.seconds, tz=datetime.timezone.utc).isoformat(),
                 'is_own_report': True,
                 'semantic_location': loc.semanticLocation.locationName,
             })
@@ -109,7 +105,7 @@ def _decrypt_to_dicts(device_update_protobuf, name: str) -> List[Dict]:
             'lon': proto_loc.longitude / 1e7,
             'altitude': proto_loc.altitude,
             'accuracy': loc.geoLocation.accuracy,
-            'time': datetime.datetime.utcfromtimestamp(ts.seconds).isoformat() + 'Z',
+            'time': datetime.datetime.fromtimestamp(ts.seconds, tz=datetime.timezone.utc).isoformat(),
             'is_own_report': loc.geoLocation.encryptedReport.isOwnReport,
             'semantic_location': None,
         })
@@ -118,10 +114,20 @@ def _decrypt_to_dicts(device_update_protobuf, name: str) -> List[Dict]:
 
 
 def fetch_all_locations(timeout_per_device: int = 30) -> List[Dict]:
-    """Fetches the latest location for every device on the account."""
+    """Fetches the latest location for every device on the account, in parallel."""
     devices = fetch_device_list()
+    if not devices:
+        return []
+
     all_locations = []
-    for name, canonic_id in devices:
-        locs = fetch_locations_for_device(canonic_id, name, timeout=timeout_per_device)
-        all_locations.extend(locs)
+    with ThreadPoolExecutor(max_workers=len(devices)) as pool:
+        futures = {
+            pool.submit(fetch_locations_for_device, canonic_id, name, timeout_per_device): name
+            for name, canonic_id in devices
+        }
+        for fut in as_completed(futures):
+            try:
+                all_locations.extend(fut.result())
+            except Exception as e:
+                print(f"[fetch] error for {futures[fut]}: {e}")
     return all_locations

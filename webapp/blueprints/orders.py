@@ -1,7 +1,17 @@
 from datetime import datetime, timezone
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from blueprints.auth import login_required, admin_required
 from db import get_db
+
+
+def _parse_quantity(raw):
+    try:
+        quantity = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if quantity < 1:
+        return None
+    return quantity
 
 orders_bp = Blueprint("orders", __name__)
 
@@ -22,17 +32,20 @@ def list_orders():
         query = query.eq("status", status)
     orders = query.execute().data
 
-    # Attach assigned tracker count
+    # One round-trip for all active assignments, grouped in Python.
+    active = (
+        db.table("order_trackers")
+        .select("order_id")
+        .is_("removed_at", "null")
+        .execute()
+        .data
+    )
+    counts: dict = {}
+    for row in active:
+        oid = row["order_id"]
+        counts[oid] = counts.get(oid, 0) + 1
     for order in orders:
-        assigned = (
-            db.table("order_trackers")
-            .select("id")
-            .eq("order_id", order["id"])
-            .is_("removed_at", "null")
-            .execute()
-            .data
-        )
-        order["assigned_count"] = len(assigned)
+        order["assigned_count"] = counts.get(order["id"], 0)
 
     customers = db.table("customers").select("id, name").order("name").execute().data
     return render_template(
@@ -50,9 +63,19 @@ def list_orders():
 def new_order():
     db = get_db()
     if request.method == "POST":
+        quantity = _parse_quantity(request.form.get("quantity"))
+        if quantity is None:
+            customers = db.table("customers").select("id, name").order("name").execute().data
+            return render_template(
+                "orders/form.html",
+                order=None,
+                customers=customers,
+                statuses=STATUSES,
+                error="Quantity must be a positive integer.",
+            ), 400
         db.table("orders").insert({
             "customer_id": request.form["customer_id"],
-            "quantity": int(request.form["quantity"]),
+            "quantity": quantity,
             "status": request.form.get("status", "pending"),
             "notes": request.form.get("notes") or None,
         }).execute()
@@ -118,9 +141,13 @@ def order_detail(order_id):
 @admin_required
 def edit_order(order_id):
     db = get_db()
+    quantity = _parse_quantity(request.form.get("quantity"))
+    if quantity is None:
+        flash("Quantity must be a positive integer.", "warning")
+        return redirect(url_for("orders.order_detail", order_id=order_id))
     db.table("orders").update({
         "status": request.form["status"],
-        "quantity": int(request.form["quantity"]),
+        "quantity": quantity,
         "notes": request.form.get("notes") or None,
     }).eq("id", order_id).execute()
     return redirect(url_for("orders.order_detail", order_id=order_id))

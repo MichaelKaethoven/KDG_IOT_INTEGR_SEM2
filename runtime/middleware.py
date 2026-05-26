@@ -1,8 +1,4 @@
-import sys
 import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'libs'))
-
 import json
 import time
 import threading
@@ -29,6 +25,8 @@ _cache_lock = threading.Lock()
 _last_poll: float = 0.0
 
 _mqtt_client: mqtt.Client | None = None
+_polling_thread: threading.Thread | None = None
+_start_lock = threading.Lock()
 
 
 def _connect_mqtt() -> mqtt.Client | None:
@@ -79,6 +77,23 @@ def polling_loop() -> None:
         time.sleep(POLL_INTERVAL)
 
 
+def _start_background_workers() -> None:
+    """Idempotent: start MQTT client + polling thread on first call.
+    Safe to call from gunicorn worker boot and from __main__."""
+    global _mqtt_client, _polling_thread
+    with _start_lock:
+        if _polling_thread is not None and _polling_thread.is_alive():
+            return
+        if _mqtt_client is None:
+            _mqtt_client = _connect_mqtt()
+        _polling_thread = threading.Thread(target=polling_loop, daemon=True)
+        _polling_thread.start()
+
+
+if os.environ.get("MIDDLEWARE_AUTOSTART", "1") == "1":
+    _start_background_workers()
+
+
 @app.route("/devices")
 def devices():
     with _cache_lock:
@@ -102,9 +117,7 @@ if __name__ == "__main__":
     POLL_INTERVAL = args.interval
     PORT          = args.port
 
-    _mqtt_client = _connect_mqtt()
-
-    t = threading.Thread(target=polling_loop, daemon=True)
-    t.start()
+    # Always start when invoked directly via `python runtime/middleware.py`
+    _start_background_workers()
 
     app.run(host="0.0.0.0", port=PORT)

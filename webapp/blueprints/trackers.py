@@ -21,19 +21,27 @@ def list_trackers():
     )
     assignment_map = {a["tracker_id"]: a["order"] for a in active}
 
-    # Get last seen for each tracker
-    for tracker in trackers:
-        tracker["assignment"] = assignment_map.get(tracker["id"])
-        loc = (
+    # One round-trip: pull all rows for these device_names ordered by time desc,
+    # then keep the latest per device_name in Python.
+    device_names = [t["device_name"] for t in trackers]
+    last_seen: dict = {}
+    if device_names:
+        locs = (
             db.table("device_locations")
-            .select("time")
-            .eq("device_name", tracker["device_name"])
+            .select("device_name, time")
+            .in_("device_name", device_names)
             .order("time", desc=True)
-            .limit(1)
             .execute()
             .data
         )
-        tracker["last_seen"] = loc[0]["time"] if loc else None
+        for row in locs:
+            name = row["device_name"]
+            if name not in last_seen:
+                last_seen[name] = row["time"]
+
+    for tracker in trackers:
+        tracker["assignment"] = assignment_map.get(tracker["id"])
+        tracker["last_seen"] = last_seen.get(tracker["device_name"])
 
     return render_template("trackers/list.html", trackers=trackers)
 

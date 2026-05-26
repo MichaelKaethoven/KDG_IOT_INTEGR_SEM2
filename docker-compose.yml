@@ -1,7 +1,6 @@
 services:
   middleware:
     build: .
-    command: python runtime/middleware.py
     ports:
       - "5500:5500"
     volumes:
@@ -18,8 +17,6 @@ services:
   subscriber:
     build: .
     command: python runtime/subscriber.py
-    depends_on:
-      - middleware
     environment:
       - MQTT_HOST=${MQTT_HOST}
       - MQTT_PORT=${MQTT_PORT:-8883}
@@ -28,6 +25,10 @@ services:
       - MQTT_TOPIC=${MQTT_TOPIC:-findmy/devices}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 60s
+      timeout: 5s
 
   webapp:
     build:

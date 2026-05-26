@@ -13,6 +13,9 @@
 <div class="card shadow-sm" style="max-width:480px">
   <div class="card-body">
     <h5 class="card-title">New Order</h5>
+    {% if error %}
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    {% endif %}
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">

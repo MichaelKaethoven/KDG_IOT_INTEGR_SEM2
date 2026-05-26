@@ -15,16 +15,20 @@ def list_customers():
         query = query.ilike("name", f"%{search}%")
     customers = query.execute().data
 
-    # Attach active tracker count to each customer
+    # One round-trip: pull every active order_tracker with its order's customer_id.
+    active = (
+        db.table("order_trackers")
+        .select("id, order:orders!inner(customer_id)")
+        .is_("removed_at", "null")
+        .execute()
+        .data
+    )
+    counts: dict = {}
+    for row in active:
+        cid = row["order"]["customer_id"]
+        counts[cid] = counts.get(cid, 0) + 1
     for customer in customers:
-        result = (
-            db.table("order_trackers")
-            .select("id, order:orders!inner(customer_id)")
-            .is_("removed_at", "null")
-            .eq("order.customer_id", customer["id"])
-            .execute()
-        )
-        customer["active_trackers"] = len(result.data)
+        customer["active_trackers"] = counts.get(customer["id"], 0)
 
     return render_template("customers/list.html", customers=customers, search=search)
 
@@ -56,17 +60,23 @@ def customer_detail(customer_id):
         .execute()
         .data
     )
-    # Attach tracker count and fulfillment to each order
-    for order in orders:
-        assigned = (
+    # One round-trip: count active trackers per order in Python.
+    order_ids = [o["id"] for o in orders]
+    counts: dict = {}
+    if order_ids:
+        active = (
             db.table("order_trackers")
-            .select("id")
-            .eq("order_id", order["id"])
+            .select("order_id")
+            .in_("order_id", order_ids)
             .is_("removed_at", "null")
             .execute()
             .data
         )
-        order["assigned_count"] = len(assigned)
+        for row in active:
+            oid = row["order_id"]
+            counts[oid] = counts.get(oid, 0) + 1
+    for order in orders:
+        order["assigned_count"] = counts.get(order["id"], 0)
 
     return render_template("customers/detail.html", customer=customer, orders=orders)
 

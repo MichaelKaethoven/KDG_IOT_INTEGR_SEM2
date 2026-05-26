@@ -18,13 +18,25 @@ MQTT_TOPIC    = os.environ.get("MQTT_TOPIC", "findmy/devices")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
+_supabase = None
+
+
+def _get_supabase():
+    global _supabase
+    if _supabase is None:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            return None
+        from supabase import create_client
+        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("[supabase] client initialised")
+    return _supabase
+
 
 def _upsert(payload: dict) -> None:
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    client = _get_supabase()
+    if client is None:
         print("[supabase] credentials not set — skipping")
         return
-    from supabase import create_client
-    client = create_client(SUPABASE_URL, SUPABASE_KEY)
     row = {
         "device_name": payload["device_name"],
         "lat":         payload["lat"],

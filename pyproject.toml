@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "googlefindmytools"
+version = "0.1.0"
+description = "Tools to interact with Google Find Hub (FCM-based device location)"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+package-dir = {"" = "libs"}
+
+[tool.setuptools.packages.find]
+where = ["libs"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["runtime"]
+markers = [
+    "integration: hits Google Find Hub / Supabase / network (deselect with '-m \"not integration\"')",
+]
