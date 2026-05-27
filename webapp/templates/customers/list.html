@@ -28,7 +28,12 @@
       <tbody>
         {% for c in customers %}
         <tr>
-          <td><a href="{{ url_for('customers.customer_detail', customer_id=c.id) }}">{{ c.name }}</a></td>
+          <td>
+            {% set idx = c.color_idx if c.color_idx is not none else 0 %}
+            <span class="color-dot" style="background:{{ palette[idx].hex }}"
+                  title="{{ palette[idx].name }}"></span>
+            <a href="{{ url_for('customers.customer_detail', customer_id=c.id) }}">{{ c.name }}</a>
+          </td>
           <td>{{ c.email or '—' }}</td>
           <td>{{ c.phone or '—' }}</td>
           <td>

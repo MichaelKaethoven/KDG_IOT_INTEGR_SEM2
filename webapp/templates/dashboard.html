@@ -42,12 +42,18 @@
     <div class="filter-group d-flex align-items-center gap-2 flex-wrap ms-md-auto">
       <div class="input-group input-group-sm filter-control">
         <span class="input-group-text"><i class="bi bi-people"></i></span>
-        <select name="customer" class="form-select" onchange="this.form.submit()">
-          <option value="all" {% if selected_customer == 'all' %}selected{% endif %}>All customers</option>
+        <select name="customer" class="form-select" onchange="this.form.submit()"
+                {% if customer_locked %}disabled{% endif %}>
+          {% if not customer_locked %}
+            <option value="all" {% if selected_customer == 'all' %}selected{% endif %}>All customers</option>
+          {% endif %}
           {% for c in customers %}
             <option value="{{ c.id }}" {% if selected_customer == c.id %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
+        {% if customer_locked %}
+          <input type="hidden" name="customer" value="{{ selected_customer }}">
+        {% endif %}
       </div>
 
       <div class="input-group input-group-sm filter-control">

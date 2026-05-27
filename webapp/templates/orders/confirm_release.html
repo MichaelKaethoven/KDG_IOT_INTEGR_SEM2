@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Confirm — Mark order {{ next_status }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{{ url_for('orders.list_orders') }}">Orders</a></li>
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('orders.order_detail', order_id=order.id) }}">{{ order.id[:8] }}…</a>
+      </li>
+      <li class="breadcrumb-item active">Mark {{ next_status }}</li>
+    </ol>
+  </nav>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">
+      Mark order as
+      <span class="badge {% if next_status == 'completed' %}bg-secondary{% else %}bg-danger{% endif %}">
+        {{ next_status }}
+      </span>
+    </h5>
+    <p class="mb-3">
+      Customer: <strong>{{ order.customer.name }}</strong> &middot;
+      Order: <code>{{ order.id[:8] }}…</code>
+    </p>
+
+    {% if active %}
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i>
+        This will release <strong>{{ active | length }}</strong> assigned tracker(s).
+        They will become available for assignment to other orders.
+      </div>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th>Device name</th><th>Serial</th></tr>
+          </thead>
+          <tbody>
+            {% for a in active %}
+            <tr>
+              <td class="font-monospace">{{ a.tracker.device_name }}</td>
+              <td>{{ a.tracker.serial_number or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">No trackers are currently assigned to this order.</p>
+    {% endif %}
+
+    <form method="post"
+          action="{{ url_for('orders.confirm_release', order_id=order.id) }}"
+          class="d-flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next_status" value="{{ next_status }}">
+      <button class="btn btn-dark">
+        <i class="bi bi-check-lg"></i> Confirm — mark {{ next_status }}
+      </button>
+      <a href="{{ url_for('orders.order_detail', order_id=order.id) }}"
+         class="btn btn-outline-secondary">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

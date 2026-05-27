@@ -7,7 +7,7 @@ import argparse
 import paho.mqtt.client as mqtt
 from flask import Flask, jsonify
 
-from location_fetcher import fetch_all_locations
+from location_fetcher import fetch_all_locations, fetch_device_list
 
 app = Flask(__name__)
 
@@ -101,6 +101,17 @@ def devices():
             "last_poll": _last_poll,
             "devices": _cache,
         })
+
+
+@app.route("/devicelist")
+def devicelist():
+    try:
+        devices = fetch_device_list()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+    return jsonify({
+        "devices": [{"device_name": name, "canonic_id": cid} for name, cid in devices],
+    })
 
 
 @app.route("/healthz")

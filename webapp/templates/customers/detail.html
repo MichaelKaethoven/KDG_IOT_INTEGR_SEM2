@@ -19,7 +19,12 @@
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <h6 class="card-title text-muted">Contact</h6>
-        <p class="mb-1"><i class="bi bi-person"></i> {{ customer.name }}</p>
+        <p class="mb-1">
+          {% set idx = customer.color_idx if customer.color_idx is not none else 0 %}
+          <span class="color-dot" style="background:{{ palette[idx].hex }}"
+                title="{{ palette[idx].name }}"></span>
+          <i class="bi bi-person"></i> {{ customer.name }}
+        </p>
         <p class="mb-1"><i class="bi bi-envelope"></i> {{ customer.email or '—' }}</p>
         <p class="mb-0"><i class="bi bi-telephone"></i> {{ customer.phone or '—' }}</p>
       </div>

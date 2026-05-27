@@ -6,7 +6,7 @@
   "timezone": "browser",
   "refresh": "1m",
   "schemaVersion": 39,
-  "version": 5,
+  "version": 7,
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
     "list": [
@@ -85,7 +85,38 @@
           "noValue": " ",
           "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "customer_color_idx" },
+            "properties": [
+              { "id": "color", "value": { "mode": "thresholds" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "#E84142", "value": null },
+                    { "color": "#1F77B4", "value": 1 },
+                    { "color": "#2CA02C", "value": 2 },
+                    { "color": "#FF7F0E", "value": 3 },
+                    { "color": "#9467BD", "value": 4 },
+                    { "color": "#FFD700", "value": 5 },
+                    { "color": "#E377C2", "value": 6 },
+                    { "color": "#17BECF", "value": 7 },
+                    { "color": "#8C564B", "value": 8 },
+                    { "color": "#7F7F7F", "value": 9 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "customer_name" },
+            "properties": [
+              { "id": "displayName", "value": "Customer" }
+            ]
+          }
+        ]
       },
       "options": {
         "view": { "id": "fit", "lat": 50.8, "lon": 4.4, "zoom": 7 },
@@ -98,7 +129,7 @@
             "config": {
               "showLegend": true,
               "style": {
-                "color": { "mode": "field", "field": "hours_since_seen" },
+                "color": { "field": "customer_color_idx" },
                 "opacity": 0.85,
                 "size": { "fixed": 9, "min": 5, "max": 15 },
                 "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" }
@@ -112,7 +143,7 @@
             "type": "route",
             "name": "Path",
             "config": {
-              "style": { "color": { "fixed": "blue" }, "lineWidth": 2, "opacity": 0.6 }
+              "style": { "color": { "field": "customer_color_idx" }, "lineWidth": 2, "opacity": 0.6 }
             },
             "location": { "mode": "coords", "latitude": "lat", "longitude": "lon" },
             "tooltip": true,
@@ -124,7 +155,7 @@
             "config": {
               "showLegend": false,
               "style": {
-                "color": { "fixed": "blue" },
+                "color": { "field": "customer_color_idx" },
                 "opacity": 0.8,
                 "size": { "fixed": 5, "min": 3, "max": 10 },
                 "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" }
@@ -143,14 +174,14 @@
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n  c.name AS customer_name,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'current'\nORDER BY dl.device_name, dl.time DESC"
+          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n  c.name AS customer_name,\n  COALESCE(c.color_idx, 0) AS customer_color_idx,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'current'\nORDER BY dl.device_name, dl.time DESC"
         },
         {
           "refId": "B",
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT\n  dl.time,\n  dl.lat,\n  dl.lon,\n  dl.device_name\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'historical'\n  AND $__timeFilter(dl.time)\nORDER BY dl.time ASC"
+          "rawSql": "SELECT\n  dl.time,\n  dl.lat,\n  dl.lon,\n  dl.device_name,\n  c.name AS customer_name,\n  COALESCE(c.color_idx, 0) AS customer_color_idx\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'historical'\n  AND $__timeFilter(dl.time)\nORDER BY dl.time ASC"
         }
       ]
     },
@@ -210,6 +241,45 @@
           {
             "matcher": { "id": "byName", "options": "device_name" },
             "properties": [{ "id": "displayName", "value": "Tracker" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "customer" },
+            "properties": [
+              { "id": "displayName", "value": "Customer" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "customer_color_idx" },
+            "properties": [
+              { "id": "displayName", "value": " " },
+              { "id": "custom.width", "value": 12 },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } },
+              { "id": "color", "value": { "mode": "thresholds" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "#E84142", "value": null },
+                    { "color": "#1F77B4", "value": 1 },
+                    { "color": "#2CA02C", "value": 2 },
+                    { "color": "#FF7F0E", "value": 3 },
+                    { "color": "#9467BD", "value": 4 },
+                    { "color": "#FFD700", "value": 5 },
+                    { "color": "#E377C2", "value": 6 },
+                    { "color": "#17BECF", "value": 7 },
+                    { "color": "#8C564B", "value": 8 },
+                    { "color": "#7F7F7F", "value": 9 }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "range", "options": { "from": -1, "to": 100, "result": { "text": " " } } }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -225,7 +295,7 @@
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "WITH current_view AS (\n  SELECT DISTINCT ON (dl.device_name)\n    dl.device_name,\n    dl.time AS last_seen,\n    ROUND(dl.lat::numeric, 5) AS lat,\n    ROUND(dl.lon::numeric, 5) AS lon,\n    ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n    c.name AS customer,\n    o.status AS order_status\n  FROM device_locations dl\n  JOIN trackers t ON t.device_name = dl.device_name\n  JOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\n  JOIN orders o ON o.id = ot.order_id\n  JOIN customers c ON c.id = o.customer_id\n  WHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n    AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n    AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n    AND '${view}' = 'current'\n  ORDER BY dl.device_name, dl.time DESC\n),\nhistorical_view AS (\n  SELECT\n    dl.device_name,\n    dl.time AS last_seen,\n    ROUND(dl.lat::numeric, 5) AS lat,\n    ROUND(dl.lon::numeric, 5) AS lon,\n    NULL::numeric AS hours_since_seen,\n    c.name AS customer,\n    o.status AS order_status\n  FROM device_locations dl\n  JOIN trackers t ON t.device_name = dl.device_name\n  JOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\n  JOIN orders o ON o.id = ot.order_id\n  JOIN customers c ON c.id = o.customer_id\n  WHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n    AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n    AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n    AND '${view}' = 'historical'\n    AND $__timeFilter(dl.time)\n)\nSELECT * FROM current_view\nUNION ALL\nSELECT * FROM historical_view\nORDER BY last_seen DESC"
+          "rawSql": "WITH current_view AS (\n  SELECT DISTINCT ON (dl.device_name)\n    COALESCE(c.color_idx, 0) AS customer_color_idx,\n    dl.device_name,\n    dl.time AS last_seen,\n    ROUND(dl.lat::numeric, 5) AS lat,\n    ROUND(dl.lon::numeric, 5) AS lon,\n    ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n    c.name AS customer,\n    o.status AS order_status\n  FROM device_locations dl\n  JOIN trackers t ON t.device_name = dl.device_name\n  JOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\n  JOIN orders o ON o.id = ot.order_id\n  JOIN customers c ON c.id = o.customer_id\n  WHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n    AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n    AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n    AND '${view}' = 'current'\n  ORDER BY dl.device_name, dl.time DESC\n),\nhistorical_view AS (\n  SELECT\n    COALESCE(c.color_idx, 0) AS customer_color_idx,\n    dl.device_name,\n    dl.time AS last_seen,\n    ROUND(dl.lat::numeric, 5) AS lat,\n    ROUND(dl.lon::numeric, 5) AS lon,\n    NULL::numeric AS hours_since_seen,\n    c.name AS customer,\n    o.status AS order_status\n  FROM device_locations dl\n  JOIN trackers t ON t.device_name = dl.device_name\n  JOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\n  JOIN orders o ON o.id = ot.order_id\n  JOIN customers c ON c.id = o.customer_id\n  WHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n    AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n    AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n    AND '${view}' = 'historical'\n    AND $__timeFilter(dl.time)\n)\nSELECT * FROM current_view\nUNION ALL\nSELECT * FROM historical_view\nORDER BY last_seen DESC"
         }
       ]
     }

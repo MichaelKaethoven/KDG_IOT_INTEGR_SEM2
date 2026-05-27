@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, current_app, request
-from blueprints.auth import login_required
+from blueprints.auth import login_required, current_customer_id
 from db import get_db
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -9,7 +9,9 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @login_required
 def index():
     db = get_db()
-    customer_id = request.args.get("customer", "all")
+    scope_id = current_customer_id()
+    # Customer-scoped sessions can't change the customer filter — pin to themselves.
+    customer_id = scope_id if scope_id else request.args.get("customer", "all")
     order_id    = request.args.get("order", "all")
     tracker_id  = request.args.get("tracker", "all")
     view        = request.args.get("view", "current")
@@ -17,7 +19,12 @@ def index():
     if view not in ("current", "historical"):
         view = "current"
 
-    customers = db.table("customers").select("id, name").order("name").execute().data
+    if scope_id:
+        customers = (
+            db.table("customers").select("id, name").eq("id", scope_id).execute().data
+        )
+    else:
+        customers = db.table("customers").select("id, name").order("name").execute().data
     all_orders = db.table("orders").select("id, customer_id, order_date, status").order("order_date", desc=True).execute().data
 
     orders = [o for o in all_orders if customer_id == "all" or o["customer_id"] == customer_id]
@@ -75,4 +82,5 @@ def index():
         selected_tracker=tracker_id,
         selected_view=view,
         iframe_src=iframe_src,
+        customer_locked=bool(scope_id),
     )

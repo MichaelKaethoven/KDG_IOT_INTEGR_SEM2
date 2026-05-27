@@ -44,6 +44,7 @@ services:
       - USER_PASSWORD_HASH=${USER_PASSWORD_HASH}
       - WEBAPP_PORT=${WEBAPP_PORT:-8080}
       - GRAFANA_URL=${GRAFANA_URL:-http://localhost:3000}
+      - MIDDLEWARE_URL=${MIDDLEWARE_URL:-http://middleware:5500}
     depends_on:
       - middleware
 

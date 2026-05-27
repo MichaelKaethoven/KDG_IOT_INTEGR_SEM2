@@ -32,6 +32,28 @@
         <label class="form-label">Phone</label>
         <input type="tel" name="phone" class="form-control" value="{{ customer.phone if customer else '' }}">
       </div>
+      <div class="mb-3">
+        <label class="form-label">Portal password</label>
+        <input type="password" name="password" class="form-control" autocomplete="new-password"
+               placeholder="{% if customer %}Leave blank to keep current password{% else %}Set a password for this customer to log in{% endif %}">
+        <div class="form-text">
+          If set, this customer can log in with this password and see only their orders and trackers.
+          <span class="text-danger">Insecure by design — passwords must be unique across customers.</span>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Dashboard color</label>
+        {% set selected_idx = customer.color_idx if customer and customer.color_idx is not none else 0 %}
+        <div class="color-swatches" role="radiogroup" aria-label="Dashboard color">
+          {% for c in palette %}
+            <label class="color-swatch" style="background:{{ c.hex }}" title="{{ c.name }}">
+              <input type="radio" name="color_idx" value="{{ c.idx }}"
+                     {% if selected_idx == c.idx %}checked{% endif %}>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="form-text">Shown on the map markers and table for this customer.</div>
+      </div>
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-dark">Save</button>
         <a href="{{ url_for('customers.list_customers') }}" class="btn btn-outline-secondary">Cancel</a>

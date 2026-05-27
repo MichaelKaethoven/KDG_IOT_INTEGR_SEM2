@@ -4,7 +4,15 @@
 <div class="d-flex align-items-center mb-3 gap-2">
   <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Trackers</h5>
   {% if session.role == 'admin' %}
-    <a href="{{ url_for('trackers.new_tracker') }}" class="btn btn-sm btn-dark ms-auto">
+    <form method="post" action="{{ url_for('trackers.sync_trackers') }}"
+          class="ms-auto d-inline"
+          onsubmit="return confirm('Fetch the device list from Google Find Hub and upsert all devices into the trackers table?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-cloud-download"></i> Sync from Google
+      </button>
+    </form>
+    <a href="{{ url_for('trackers.new_tracker') }}" class="btn btn-sm btn-dark">
       <i class="bi bi-plus-lg"></i> Add Tracker
     </a>
   {% endif %}

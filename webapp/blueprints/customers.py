@@ -1,14 +1,43 @@
-from flask import Blueprint, render_template, request, redirect, url_for
-from blueprints.auth import login_required, admin_required
+from flask import Blueprint, render_template, request, redirect, url_for, abort
+from werkzeug.security import generate_password_hash
+from blueprints.auth import login_required, admin_required, current_customer_id
 from db import get_db
 
 customers_bp = Blueprint("customers", __name__)
+
+# Fixed palette — must stay in lock-step with the customer_color_idx thresholds
+# in grafana/provisioning/dashboards/trackers.json. Index = step value.
+CUSTOMER_PALETTE = [
+    {"idx": 0, "hex": "#E84142", "name": "Red"},
+    {"idx": 1, "hex": "#1F77B4", "name": "Blue"},
+    {"idx": 2, "hex": "#2CA02C", "name": "Green"},
+    {"idx": 3, "hex": "#FF7F0E", "name": "Orange"},
+    {"idx": 4, "hex": "#9467BD", "name": "Purple"},
+    {"idx": 5, "hex": "#FFD700", "name": "Gold"},
+    {"idx": 6, "hex": "#E377C2", "name": "Pink"},
+    {"idx": 7, "hex": "#17BECF", "name": "Cyan"},
+    {"idx": 8, "hex": "#8C564B", "name": "Brown"},
+    {"idx": 9, "hex": "#7F7F7F", "name": "Gray"},
+]
+
+
+def _parse_color_idx(value: str | None) -> int:
+    try:
+        idx = int(value) if value is not None else 0
+    except (TypeError, ValueError):
+        idx = 0
+    return idx if 0 <= idx < len(CUSTOMER_PALETTE) else 0
 
 
 @customers_bp.route("/")
 @login_required
 def list_customers():
     db = get_db()
+    # A customer-scoped session only ever sees its own record on this page.
+    scope_id = current_customer_id()
+    if scope_id:
+        return redirect(url_for("customers.customer_detail", customer_id=scope_id))
+
     search = request.args.get("q", "").strip()
     query = db.table("customers").select("*").order("name")
     if search:
@@ -30,7 +59,12 @@ def list_customers():
     for customer in customers:
         customer["active_trackers"] = counts.get(customer["id"], 0)
 
-    return render_template("customers/list.html", customers=customers, search=search)
+    return render_template(
+        "customers/list.html",
+        customers=customers,
+        search=search,
+        palette=CUSTOMER_PALETTE,
+    )
 
 
 @customers_bp.route("/new", methods=["GET", "POST"])
@@ -38,18 +72,27 @@ def list_customers():
 def new_customer():
     if request.method == "POST":
         db = get_db()
-        db.table("customers").insert({
+        payload = {
             "name": request.form["name"],
             "email": request.form.get("email") or None,
             "phone": request.form.get("phone") or None,
-        }).execute()
+            "color_idx": _parse_color_idx(request.form.get("color_idx")),
+        }
+        new_password = request.form.get("password", "").strip()
+        if new_password:
+            payload["password_hash"] = generate_password_hash(new_password)
+        db.table("customers").insert(payload).execute()
         return redirect(url_for("customers.list_customers"))
-    return render_template("customers/form.html", customer=None)
+    return render_template("customers/form.html", customer=None, palette=CUSTOMER_PALETTE)
 
 
 @customers_bp.route("/<customer_id>")
 @login_required
 def customer_detail(customer_id):
+    scope_id = current_customer_id()
+    if scope_id and scope_id != customer_id:
+        abort(403)
+
     db = get_db()
     customer = db.table("customers").select("*").eq("id", customer_id).single().execute().data
     orders = (
@@ -78,7 +121,12 @@ def customer_detail(customer_id):
     for order in orders:
         order["assigned_count"] = counts.get(order["id"], 0)
 
-    return render_template("customers/detail.html", customer=customer, orders=orders)
+    return render_template(
+        "customers/detail.html",
+        customer=customer,
+        orders=orders,
+        palette=CUSTOMER_PALETTE,
+    )
 
 
 @customers_bp.route("/<customer_id>/edit", methods=["GET", "POST"])
@@ -87,13 +135,18 @@ def edit_customer(customer_id):
     db = get_db()
     customer = db.table("customers").select("*").eq("id", customer_id).single().execute().data
     if request.method == "POST":
-        db.table("customers").update({
+        payload = {
             "name": request.form["name"],
             "email": request.form.get("email") or None,
             "phone": request.form.get("phone") or None,
-        }).eq("id", customer_id).execute()
+            "color_idx": _parse_color_idx(request.form.get("color_idx")),
+        }
+        new_password = request.form.get("password", "").strip()
+        if new_password:
+            payload["password_hash"] = generate_password_hash(new_password)
+        db.table("customers").update(payload).eq("id", customer_id).execute()
         return redirect(url_for("customers.customer_detail", customer_id=customer_id))
-    return render_template("customers/form.html", customer=customer)
+    return render_template("customers/form.html", customer=customer, palette=CUSTOMER_PALETTE)
 
 
 @customers_bp.route("/<customer_id>/delete", methods=["POST"])

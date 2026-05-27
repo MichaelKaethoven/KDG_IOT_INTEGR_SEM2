@@ -23,10 +23,12 @@
             <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}"
                href="{{ url_for('dashboard.index') }}"><i class="bi bi-map"></i> Dashboard</a>
           </li>
+          {% if session.role != 'customer' %}
           <li class="nav-item">
             <a class="nav-link {% if request.blueprint == 'customers' %}active{% endif %}"
                href="{{ url_for('customers.list_customers') }}"><i class="bi bi-people"></i> Customers</a>
           </li>
+          {% endif %}
           <li class="nav-item">
             <a class="nav-link {% if request.blueprint == 'orders' %}active{% endif %}"
                href="{{ url_for('orders.list_orders') }}"><i class="bi bi-box-seam"></i> Orders</a>
@@ -40,7 +42,11 @@
           <li class="nav-item">
             <span class="navbar-text me-3">
               <i class="bi bi-person-circle"></i>
-              {{ session.role | capitalize }}
+              {% if session.role == 'customer' %}
+                {{ session.customer_name }}
+              {% else %}
+                {{ session.role | capitalize }}
+              {% endif %}
             </span>
           </li>
           <li class="nav-item">
