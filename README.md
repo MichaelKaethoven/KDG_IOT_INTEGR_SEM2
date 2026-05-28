@@ -1,5 +1,9 @@
 # GoogleFindMyTools — Integration Project 2025-2026 Sem 2
 
+> **Setting this up or handing it over?** Read **[`DEPLOYMENT.md`](DEPLOYMENT.md)** —
+> a complete, step-by-step guide to configuring, running and deploying the whole
+> system from a fresh clone.
+
 **Team**
 
 | GitHub            | Name              |

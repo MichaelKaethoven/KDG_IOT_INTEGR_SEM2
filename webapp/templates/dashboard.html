@@ -37,6 +37,20 @@
       </label>
     </div>
 
+    {% if selected_view == 'historical' %}
+      <div class="input-group input-group-sm filter-control" style="max-width:200px">
+        <span class="input-group-text"><i class="bi bi-calendar-range"></i></span>
+        <select name="range" class="form-select" onchange="this.form.submit()"
+                title="Playback time range">
+          {% for value, label, _gf in time_range_options %}
+            <option value="{{ value }}" {% if selected_range == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% else %}
+      <input type="hidden" name="range" value="{{ selected_range }}">
+    {% endif %}
+
     <div class="vr d-none d-md-block"></div>
 
     <div class="filter-group d-flex align-items-center gap-2 flex-wrap ms-md-auto">
@@ -82,7 +96,7 @@
       </div>
 
       {% if selected_customer != 'all' or selected_order != 'all' or selected_tracker != 'all' %}
-        <a href="{{ url_for('dashboard.index', view=selected_view) }}"
+        <a href="{{ url_for('dashboard.index', view=selected_view, range=selected_range) }}"
            class="btn btn-sm btn-outline-secondary"
            title="Clear filters">
           <i class="bi bi-x-lg"></i>

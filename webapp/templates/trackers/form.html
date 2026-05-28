@@ -37,4 +37,38 @@
     </form>
   </div>
 </div>
+
+{% if tracker %}
+<div class="card shadow-sm mt-4" style="max-width:480px">
+  <div class="card-body">
+    <h6 class="card-title"><i class="bi bi-journal-text"></i> Condition log</h6>
+    <p class="text-muted small">Dated entries for damage, battery swaps, firmware updates, etc.</p>
+
+    <form method="post" action="{{ url_for('trackers.add_tracker_note', tracker_id=tracker.id) }}"
+          class="mb-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="input-group input-group-sm">
+        <input type="text" name="note" class="form-control"
+               placeholder="Add a log entry…" maxlength="500" required>
+        <button class="btn btn-dark" type="submit">
+          <i class="bi bi-plus-lg"></i> Add
+        </button>
+      </div>
+    </form>
+
+    {% if notes %}
+      <ul class="list-group list-group-flush">
+        {% for n in notes %}
+        <li class="list-group-item px-0">
+          <div class="small text-muted">{{ n.created_at[:19].replace('T',' ') }}</div>
+          <div>{{ n.note }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-muted small mb-0">No log entries yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}

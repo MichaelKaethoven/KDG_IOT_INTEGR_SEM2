@@ -4,6 +4,21 @@ from db import get_db
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
+# Time ranges offered for the historical map. Keys are the URL/form values; the
+# Grafana value is a relative-time expression Grafana understands as `from`
+# (paired with `to=now`). Allow-listed so nothing user-controlled is interpolated
+# verbatim into the iframe URL.
+TIME_RANGE_OPTIONS = [
+    ("1h", "Last 1 hour", "now-1h"),
+    ("6h", "Last 6 hours", "now-6h"),
+    ("24h", "Last 24 hours", "now-24h"),
+    ("7d", "Last 7 days", "now-7d"),
+    ("30d", "Last 30 days", "now-30d"),
+    ("90d", "Last 90 days", "now-90d"),
+]
+TIME_RANGE_FROM = {key: gf for key, _, gf in TIME_RANGE_OPTIONS}
+DEFAULT_RANGE = "24h"
+
 
 @dashboard_bp.route("/")
 @login_required
@@ -15,9 +30,12 @@ def index():
     order_id    = request.args.get("order", "all")
     tracker_id  = request.args.get("tracker", "all")
     view        = request.args.get("view", "current")
+    time_range  = request.args.get("range", DEFAULT_RANGE)
 
     if view not in ("current", "historical"):
         view = "current"
+    if time_range not in TIME_RANGE_FROM:
+        time_range = DEFAULT_RANGE
 
     if scope_id:
         customers = (
@@ -69,6 +87,7 @@ def index():
         f"&var-order_var={order_id}"
         f"&var-tracker={tracker_id}"
         f"&var-view={view}"
+        f"&from={TIME_RANGE_FROM[time_range]}&to=now"
         f"&kiosk&theme=light"
     )
 
@@ -81,6 +100,8 @@ def index():
         selected_order=order_id,
         selected_tracker=tracker_id,
         selected_view=view,
+        selected_range=time_range,
+        time_range_options=TIME_RANGE_OPTIONS,
         iframe_src=iframe_src,
         customer_locked=bool(scope_id),
     )

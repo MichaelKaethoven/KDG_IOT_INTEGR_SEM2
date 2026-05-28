@@ -18,21 +18,34 @@
   {% endif %}
 </div>
 
+<div class="btn-group btn-group-sm mb-3" role="group" aria-label="Tracker filter">
+  <a href="{{ url_for('trackers.list_trackers') }}"
+     class="btn {{ 'btn-dark' if not show_stale_only else 'btn-outline-dark' }}">
+    All trackers
+  </a>
+  <a href="{{ url_for('trackers.list_trackers', filter='stale') }}"
+     class="btn {{ 'btn-danger' if show_stale_only else 'btn-outline-danger' }}">
+    <i class="bi bi-exclamation-triangle"></i>
+    No ping &gt; {{ stale_hours }}h
+    <span class="badge bg-light text-dark ms-1">{{ stale_count }}</span>
+  </a>
+</div>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
+    <table class="table table-hover mb-0 align-middle">
       <thead class="table-dark">
         <tr>
-          <th>Device name</th><th>Serial</th><th>Notes</th>
-          <th>Status</th><th>Customer / Order</th><th>Last seen</th><th></th>
+          <th>Device name</th><th>Serial</th>
+          <th>Status</th><th>With customer</th><th>In order</th>
+          <th>Last seen at</th><th></th>
         </tr>
       </thead>
       <tbody>
         {% for t in trackers %}
-        <tr>
+        <tr class="{{ 'table-danger' if t.stale }}">
           <td class="font-monospace">{{ t.device_name }}</td>
           <td>{{ t.serial_number or '—' }}</td>
-          <td>{{ t.notes or '—' }}</td>
           <td>
             {% if t.assignment %}
               <span class="badge bg-success">Assigned</span>
@@ -44,12 +57,24 @@
             {% if t.assignment %}
               <a href="{{ url_for('customers.customer_detail', customer_id=t.assignment.customer.id) }}">
                 {{ t.assignment.customer.name }}</a>
-              /
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if t.assignment %}
               <a href="{{ url_for('orders.order_detail', order_id=t.assignment.id) }}">
                 {{ t.assignment.id[:8] }}…</a>
             {% else %}—{% endif %}
           </td>
-          <td>{{ t.last_seen[:19].replace('T',' ') if t.last_seen else '—' }}</td>
+          <td>
+            {% if t.last_seen %}
+              {{ t.last_seen[:19].replace('T',' ') }}
+              {% if t.stale %}
+                <span class="badge bg-danger ms-1" title="No ping in over {{ stale_hours }}h">stale</span>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-danger">Never</span>
+            {% endif %}
+          </td>
           <td class="text-end">
             {% if session.role == 'admin' %}
               <a href="{{ url_for('trackers.edit_tracker', tracker_id=t.id) }}"
@@ -64,7 +89,9 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-muted text-center py-3">No trackers in inventory.</td></tr>
+        <tr><td colspan="7" class="text-muted text-center py-3">
+          {% if show_stale_only %}No stale trackers — everything has pinged within {{ stale_hours }}h.{% else %}No trackers in inventory.{% endif %}
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>

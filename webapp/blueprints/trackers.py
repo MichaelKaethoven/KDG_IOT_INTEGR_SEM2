@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, render_template, request, redirect, url_for, flash
@@ -8,6 +9,22 @@ from db import get_db
 trackers_bp = Blueprint("trackers", __name__)
 
 MIDDLEWARE_URL = os.environ.get("MIDDLEWARE_URL", "http://middleware:5500")
+
+# A tracker is "stale" if it has not reported a location within this many hours.
+STALE_HOURS = int(os.environ.get("TRACKER_STALE_HOURS", "24"))
+
+
+def _is_stale(last_seen_iso, cutoff) -> bool:
+    """True if the tracker has no ping at all, or its last ping is before cutoff."""
+    if not last_seen_iso:
+        return True
+    try:
+        ts = datetime.fromisoformat(last_seen_iso.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts < cutoff
 
 
 @trackers_bp.route("/")
@@ -64,11 +81,26 @@ def list_trackers():
             if name not in last_seen:
                 last_seen[name] = row["time"]
 
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=STALE_HOURS)
     for tracker in trackers:
         tracker["assignment"] = assignment_map.get(tracker["id"])
         tracker["last_seen"] = last_seen.get(tracker["device_name"])
+        tracker["stale"] = _is_stale(tracker["last_seen"], cutoff)
 
-    return render_template("trackers/list.html", trackers=trackers)
+    stale_count = sum(1 for t in trackers if t["stale"])
+
+    # ?filter=stale shows only trackers with no ping in the last STALE_HOURS.
+    show_stale_only = request.args.get("filter") == "stale"
+    if show_stale_only:
+        trackers = [t for t in trackers if t["stale"]]
+
+    return render_template(
+        "trackers/list.html",
+        trackers=trackers,
+        stale_hours=STALE_HOURS,
+        stale_count=stale_count,
+        show_stale_only=show_stale_only,
+    )
 
 
 @trackers_bp.route("/new", methods=["GET", "POST"])
@@ -97,7 +129,31 @@ def edit_tracker(tracker_id):
             "notes": request.form.get("notes") or None,
         }).eq("id", tracker_id).execute()
         return redirect(url_for("trackers.list_trackers"))
-    return render_template("trackers/form.html", tracker=tracker)
+    notes = (
+        db.table("tracker_notes")
+        .select("*")
+        .eq("tracker_id", tracker_id)
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
+    return render_template("trackers/form.html", tracker=tracker, notes=notes)
+
+
+@trackers_bp.route("/<tracker_id>/notes", methods=["POST"])
+@admin_required
+def add_tracker_note(tracker_id):
+    note = (request.form.get("note") or "").strip()
+    if not note:
+        flash("Note cannot be empty.", "warning")
+        return redirect(url_for("trackers.edit_tracker", tracker_id=tracker_id))
+    db = get_db()
+    db.table("tracker_notes").insert({
+        "tracker_id": tracker_id,
+        "note": note,
+    }).execute()
+    flash("Note added.", "success")
+    return redirect(url_for("trackers.edit_tracker", tracker_id=tracker_id))
 
 
 @trackers_bp.route("/<tracker_id>/delete", methods=["POST"])

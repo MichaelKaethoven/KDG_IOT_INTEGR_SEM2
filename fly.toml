@@ -9,7 +9,7 @@ primary_region = 'ams'
 [build]
 
 [processes]
-  middleware = 'python runtime/middleware.py'
+  middleware = 'gunicorn --chdir runtime --bind [::]:5500 --workers 1 --threads 4 middleware:app'
   subscriber = 'python runtime/subscriber.py'
 
 [[mounts]]

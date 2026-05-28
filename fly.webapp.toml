@@ -4,6 +4,9 @@ primary_region = 'ams'
 [build]
   dockerfile = "Dockerfile.webapp"
 
+[env]
+  MIDDLEWARE_URL = "http://findmy-middleware-dappled-silence-7211.internal:5500"
+
 [[services]]
   protocol      = 'tcp'
   internal_port = 8080
