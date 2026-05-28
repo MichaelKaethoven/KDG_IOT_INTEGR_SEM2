@@ -79,12 +79,19 @@
             {% if session.role == 'admin' %}
               <a href="{{ url_for('trackers.edit_tracker', tracker_id=t.id) }}"
                  class="btn btn-sm btn-outline-secondary">Edit</a>
-              <form method="post" action="{{ url_for('trackers.delete_tracker', tracker_id=t.id) }}"
-                    class="d-inline"
-                    onsubmit="return confirm('Delete {{ t.device_name }}?')">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="btn btn-sm btn-outline-danger">Delete</button>
-              </form>
+              {% if t.assignment %}
+                <button class="btn btn-sm btn-outline-danger" disabled
+                        title="Assigned to an active order — remove it from the order before deleting.">
+                  Delete
+                </button>
+              {% else %}
+                <form method="post" action="{{ url_for('trackers.delete_tracker', tracker_id=t.id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Delete {{ t.device_name }}?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              {% endif %}
             {% endif %}
           </td>
         </tr>

@@ -160,6 +160,19 @@ def add_tracker_note(tracker_id):
 @admin_required
 def delete_tracker(tracker_id):
     db = get_db()
+    active = (
+        db.table("order_trackers")
+        .select("order_id")
+        .eq("tracker_id", tracker_id)
+        .is_("removed_at", "null")
+        .limit(1)
+        .execute()
+        .data
+    )
+    if active:
+        flash("Cannot delete a tracker that is assigned to an active order. "
+              "Remove it from the order first.", "danger")
+        return redirect(url_for("trackers.list_trackers"))
     db.table("trackers").delete().eq("id", tracker_id).execute()
     return redirect(url_for("trackers.list_trackers"))
 

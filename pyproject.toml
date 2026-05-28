@@ -18,6 +18,9 @@ namespaces = false
 [tool.pytest.ini_options]
 testpaths = ["test"]
 pythonpath = ["runtime"]
+filterwarnings = [
+    "ignore::DeprecationWarning:gpsoauth",
+]
 markers = [
     "integration: hits Google Find Hub / Supabase / network (deselect with '-m \"not integration\"')",
 ]
