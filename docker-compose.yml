@@ -7,12 +7,18 @@ services:
       - ./libs/Auth:/app/libs/Auth
     environment:
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
+      - LOCATION_BATCH_SIZE=${LOCATION_BATCH_SIZE:-8}
+      - LOCATION_BATCH_DELAY=${LOCATION_BATCH_DELAY:-2.0}
       - PORT=5500
       - MQTT_HOST=${MQTT_HOST}
       - MQTT_PORT=${MQTT_PORT:-8883}
       - MQTT_USER=${MQTT_USER}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
       - MQTT_TOPIC=${MQTT_TOPIC:-findmy/devices}
+      # Read by the middleware to pick up live Settings-page changes from the
+      # app_settings table. Optional — falls back to the env defaults above.
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
 
   subscriber:
     build: .

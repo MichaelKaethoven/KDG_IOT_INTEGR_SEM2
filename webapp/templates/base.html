@@ -37,6 +37,12 @@
             <a class="nav-link {% if request.blueprint == 'trackers' %}active{% endif %}"
                href="{{ url_for('trackers.list_trackers') }}"><i class="bi bi-geo-alt"></i> Trackers</a>
           </li>
+          {% if session.role == 'admin' %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.blueprint == 'settings' %}active{% endif %}"
+               href="{{ url_for('settings.index') }}"><i class="bi bi-gear"></i> Settings</a>
+          </li>
+          {% endif %}
         </ul>
         <ul class="navbar-nav align-items-center">
           <li class="nav-item">

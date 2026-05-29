@@ -156,7 +156,7 @@ The main location-fetching engine used by the middleware. Three public functions
 
 - **`fetch_device_list()`** — lists all paired devices by calling Nova `nbe_list_devices` and parsing canonic IDs from the protobuf response
 - **`fetch_locations_for_device(canonic_id, name, timeout=30)`** — registers an FCM callback, fires a Nova `nbe_execute_action` locate request, waits up to `timeout` seconds for the FCM push response, then decrypts all returned location reports and returns them as plain dicts
-- **`fetch_all_locations()`** — iterates every device on the account and aggregates all results
+- **`fetch_all_locations()`** — fetches every device on the account in batches of `LOCATION_BATCH_SIZE` (default 8, in parallel per batch) with `LOCATION_BATCH_DELAY` seconds between batches to avoid Google rate limits, then aggregates all results
 
 Decryption handles both report types:
 
@@ -169,7 +169,7 @@ Semantic (non-GPS) locations are returned with `lat=None` and a `semantic_locati
 
 A **Flask + MQTT polling service** — the main runtime process, managed by `findhub.service`.
 
-- Spawns a background thread that calls `fetch_all_locations()` every `POLL_INTERVAL` seconds (default: 300 s, overridable via env var or `--interval`)
+- Spawns a background thread that calls `fetch_all_locations()` on a loop. The interval and batching knobs (`poll_interval`, `location_batch_size`, `location_batch_delay`, `location_timeout`) are re-read from the Supabase `app_settings` table at the start of each cycle — editable live from the portal **Settings** page (admin) — falling back to the matching env vars (`POLL_INTERVAL`, default 300 s, …) when a key is unset or Supabase is unavailable
 - Caches the last result in memory under a thread lock
 - Publishes each device's location to the MQTT broker on topic `findmy/devices/<device_name>/location` (QoS 1, retained)
 - Exposes two HTTP endpoints:

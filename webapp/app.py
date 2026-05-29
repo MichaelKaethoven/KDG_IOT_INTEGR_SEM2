@@ -20,12 +20,14 @@ def create_app() -> Flask:
     from blueprints.customers import customers_bp
     from blueprints.orders import orders_bp
     from blueprints.trackers import trackers_bp
+    from blueprints.settings import settings_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(customers_bp, url_prefix="/customers")
     app.register_blueprint(orders_bp, url_prefix="/orders")
     app.register_blueprint(trackers_bp, url_prefix="/trackers")
+    app.register_blueprint(settings_bp, url_prefix="/settings")
 
     return app
 

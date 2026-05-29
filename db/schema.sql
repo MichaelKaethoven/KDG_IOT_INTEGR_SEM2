@@ -89,3 +89,13 @@ create table if not exists tracker_notes (
 );
 create index if not exists tracker_notes_tracker_id_idx
     on tracker_notes(tracker_id, created_at desc);
+
+-- Runtime tuning knobs editable from the portal Settings page ----------------
+-- Key/value store read by the webapp (edit) and the middleware (each poll
+-- cycle). Missing keys fall back to env/hardcoded defaults in code, so this
+-- table can be empty on a fresh install.
+create table if not exists app_settings (
+    key        text        primary key,
+    value      text        not null,
+    updated_at timestamptz not null default now()
+);

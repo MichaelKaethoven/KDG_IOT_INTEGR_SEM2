@@ -364,7 +364,7 @@ see only their own data.
 **In order** and **Last seen at**.
 
 - **Staleness:** a tracker that hasn't reported a location in the last
-  `TRACKER_STALE_HOURS` (default **24**, see [section 10](#10-environment-variable-reference))
+  `TRACKER_STALE_HOURS` (default **24**, editable live on the **Settings** page)
   is highlighted **red** with a `stale` badge (or `Never` if it has never pinged).
   Use the **No ping > Nh** toggle above the table to show only stale trackers; the
   toggle carries a live count. This replaces the email-alert idea — staleness is
@@ -409,6 +409,25 @@ pinned to their own data automatically.
   it redraws the playback for that window. The range is passed to the Grafana
   iframe as `from`/`to`, so the embedded map reflects it without needing Grafana's
   own (kiosk-hidden) time picker.
+
+### Settings (admin only)
+The `Settings` tab (visible only to admins) edits runtime tuning knobs without a
+redeploy. Values are stored in the `app_settings` table and override the matching
+environment defaults:
+
+| Setting | Affects | Notes |
+|---|---|---|
+| **Poll interval** | middleware | Seconds between Google polls. Floor 300. |
+| **Location batch size** | middleware | Devices fetched in parallel per batch (5–10 safe). |
+| **Location batch delay** | middleware | Seconds paused between batches. |
+| **Location timeout** | middleware | Seconds to wait for each device's location response. |
+| **Tracker stale hours** | webapp | Hours without a ping before a tracker shows red. |
+
+Middleware knobs are re-read at the start of **every poll cycle**, so a change
+takes effect on the next poll (no restart). For the middleware to see these
+values it must have `SUPABASE_URL` / `SUPABASE_KEY` set (it does in Docker Compose
+and on Fly); without them it falls back to the environment defaults. Tracker stale
+hours is read by the webapp on each Trackers page load, so it applies immediately.
 
 ---
 
@@ -475,6 +494,10 @@ authenticates that browser request:
 
 **Polling cadence.** The middleware polls every `POLL_INTERVAL` seconds (default
 300; Google's practical floor). Lower values risk rate-limiting / account flags.
+Within each poll, locations are fetched in batches of `LOCATION_BATCH_SIZE`
+devices (default 8) in parallel, with `LOCATION_BATCH_DELAY` seconds (default 2)
+between batches, so large accounts don't burst-hit Google's per-device location
+endpoint. The device list itself is a single call and is not batched.
 
 **Re-authenticating with Google.** Tokens in `secrets.json` eventually expire (or
 break after an E2EE reset). Symptom: middleware logs `401`/decrypt errors and no
@@ -501,14 +524,17 @@ Google** in the portal.
 
 | Variable | Used by | Required | Notes |
 |---|---|---|---|
-| `POLL_INTERVAL` | middleware | no (300) | Seconds between Google polls. |
+| `POLL_INTERVAL` | middleware | no (300) | Seconds between Google polls. Default for the live **Settings** value. |
+| `LOCATION_BATCH_SIZE` | middleware | no (8) | Devices fetched in parallel per batch (5–10 recommended). Default for the live **Settings** value. |
+| `LOCATION_BATCH_DELAY` | middleware | no (2.0) | Seconds paused between batches. Default for the live **Settings** value. |
+| `LOCATION_TIMEOUT` | middleware | no (30) | Seconds to wait per device's location response. Default for the live **Settings** value. |
 | `PORT` | middleware | no (5500) | Middleware HTTP port. |
 | `MQTT_HOST` | middleware, subscriber | **yes** | Broker hostname. |
 | `MQTT_PORT` | middleware, subscriber | no (8883) | TLS port. |
 | `MQTT_USER` / `MQTT_PASSWORD` | middleware, subscriber | **yes** | Broker credentials. |
 | `MQTT_TOPIC` | middleware, subscriber | no (`findmy/devices`) | Base topic. |
-| `SUPABASE_URL` | subscriber, webapp | **yes** | `https://<ref>.supabase.co`. |
-| `SUPABASE_KEY` | subscriber, webapp | **yes** | Service role key. |
+| `SUPABASE_URL` | subscriber, webapp, middleware | **yes** | `https://<ref>.supabase.co`. Middleware uses it to read live Settings. |
+| `SUPABASE_KEY` | subscriber, webapp, middleware | **yes** | Service role key. Middleware uses it to read live Settings. |
 | `SUPABASE_DB_HOST` | grafana | **yes** | Direct PostgreSQL host (pooler). |
 | `SUPABASE_DB_USER` | grafana | **yes** | `postgres.<ref>`. |
 | `SUPABASE_DB_PASSWORD` | grafana | **yes** | Database password. |

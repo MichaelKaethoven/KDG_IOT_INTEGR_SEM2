@@ -1,5 +1,7 @@
 import hashlib
+import os
 import threading
+import time
 import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
@@ -113,21 +115,39 @@ def _decrypt_to_dicts(device_update_protobuf, name: str) -> List[Dict]:
     return results
 
 
-def fetch_all_locations(timeout_per_device: int = 30) -> List[Dict]:
-    """Fetches the latest location for every device on the account, in parallel."""
+# How many devices to request locations for at once, and how long to pause
+# between batches. Google rate-limits bursts of location requests, so we cap
+# concurrency and space batches out instead of firing every device at once.
+LOCATION_BATCH_SIZE = int(os.environ.get("LOCATION_BATCH_SIZE", 8))
+LOCATION_BATCH_DELAY = float(os.environ.get("LOCATION_BATCH_DELAY", 2.0))
+
+
+def fetch_all_locations(timeout_per_device: int = 30,
+                        batch_size: int = LOCATION_BATCH_SIZE,
+                        batch_delay: float = LOCATION_BATCH_DELAY) -> List[Dict]:
+    """Fetches the latest location for every device on the account.
+
+    Devices are processed in batches of ``batch_size`` (each batch fetched in
+    parallel, batches run sequentially) with a ``batch_delay``-second pause
+    between batches to avoid tripping Google's rate limits.
+    """
     devices = fetch_device_list()
     if not devices:
         return []
 
     all_locations = []
-    with ThreadPoolExecutor(max_workers=len(devices)) as pool:
-        futures = {
-            pool.submit(fetch_locations_for_device, canonic_id, name, timeout_per_device): name
-            for name, canonic_id in devices
-        }
-        for fut in as_completed(futures):
-            try:
-                all_locations.extend(fut.result())
-            except Exception as e:
-                print(f"[fetch] error for {futures[fut]}: {e}")
+    for start in range(0, len(devices), batch_size):
+        batch = devices[start:start + batch_size]
+        with ThreadPoolExecutor(max_workers=len(batch)) as pool:
+            futures = {
+                pool.submit(fetch_locations_for_device, canonic_id, name, timeout_per_device): name
+                for name, canonic_id in batch
+            }
+            for fut in as_completed(futures):
+                try:
+                    all_locations.extend(fut.result())
+                except Exception as e:
+                    print(f"[fetch] error for {futures[fut]}: {e}")
+        if batch_delay and start + batch_size < len(devices):
+            time.sleep(batch_delay)
     return all_locations

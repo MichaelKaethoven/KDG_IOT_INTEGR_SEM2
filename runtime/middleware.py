@@ -8,6 +8,7 @@ import paho.mqtt.client as mqtt
 from flask import Flask, jsonify
 
 from location_fetcher import fetch_all_locations, fetch_device_list
+from settings import load_runtime_settings
 
 app = Flask(__name__)
 
@@ -64,9 +65,17 @@ def _publish_locations(data: list) -> None:
 def polling_loop() -> None:
     global _cache, _last_poll
     while True:
+        # Re-read settings each cycle so portal edits apply without a restart.
+        cfg = load_runtime_settings()
         try:
-            print("[poll] fetching locations...")
-            data = fetch_all_locations(timeout_per_device=30)
+            print(f"[poll] fetching locations... (interval={cfg['poll_interval']}s, "
+                  f"batch={cfg['location_batch_size']}, delay={cfg['location_batch_delay']}s, "
+                  f"timeout={cfg['location_timeout']}s)")
+            data = fetch_all_locations(
+                timeout_per_device=cfg["location_timeout"],
+                batch_size=cfg["location_batch_size"],
+                batch_delay=cfg["location_batch_delay"],
+            )
             with _cache_lock:
                 _cache = data
                 _last_poll = time.time()
@@ -74,7 +83,7 @@ def polling_loop() -> None:
             _publish_locations(data)
         except Exception as e:
             print(f"[poll] error: {e}")
-        time.sleep(POLL_INTERVAL)
+        time.sleep(cfg["poll_interval"])
 
 
 def _start_background_workers() -> None:
@@ -127,6 +136,10 @@ if __name__ == "__main__":
 
     POLL_INTERVAL = args.interval
     PORT          = args.port
+
+    # The polling loop reads the interval from settings (env default when
+    # Supabase is unset); surface --interval there so local runs honour it.
+    os.environ["POLL_INTERVAL"] = str(args.interval)
 
     # Always start when invoked directly via `python runtime/middleware.py`
     _start_background_workers()

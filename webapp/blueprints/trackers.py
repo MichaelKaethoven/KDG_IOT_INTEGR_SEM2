@@ -5,13 +5,11 @@ import requests
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from blueprints.auth import login_required, admin_required, current_customer_id
 from db import get_db
+from settings_store import get_setting
 
 trackers_bp = Blueprint("trackers", __name__)
 
 MIDDLEWARE_URL = os.environ.get("MIDDLEWARE_URL", "http://middleware:5500")
-
-# A tracker is "stale" if it has not reported a location within this many hours.
-STALE_HOURS = int(os.environ.get("TRACKER_STALE_HOURS", "24"))
 
 
 def _is_stale(last_seen_iso, cutoff) -> bool:
@@ -81,7 +79,8 @@ def list_trackers():
             if name not in last_seen:
                 last_seen[name] = row["time"]
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=STALE_HOURS)
+    stale_hours = get_setting("tracker_stale_hours")
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
     for tracker in trackers:
         tracker["assignment"] = assignment_map.get(tracker["id"])
         tracker["last_seen"] = last_seen.get(tracker["device_name"])
@@ -89,7 +88,7 @@ def list_trackers():
 
     stale_count = sum(1 for t in trackers if t["stale"])
 
-    # ?filter=stale shows only trackers with no ping in the last STALE_HOURS.
+    # ?filter=stale shows only trackers with no ping in the last stale_hours.
     show_stale_only = request.args.get("filter") == "stale"
     if show_stale_only:
         trackers = [t for t in trackers if t["stale"]]
@@ -97,7 +96,7 @@ def list_trackers():
     return render_template(
         "trackers/list.html",
         trackers=trackers,
-        stale_hours=STALE_HOURS,
+        stale_hours=stale_hours,
         stale_count=stale_count,
         show_stale_only=show_stale_only,
     )
