@@ -314,12 +314,20 @@ flyctl secrets set --app findmy-grafana `
 > **names must match the code** exactly (`ADMIN_PASSWORD_HASH`, not
 > `ADMIN_PASSWORD`).
 
-**3. Deploy each app:**
+**3. Deploy each app.** The easiest way is the helper script, which deploys all
+three in the right order (middleware first) using the app names from each config:
 
 ```powershell
-flyctl deploy --config fly.toml         --app findmy-middleware-...
-flyctl deploy --config fly.webapp.toml  --app findmy-webapp
-flyctl deploy --config fly.grafana.toml --app findmy-grafana
+.\scripts\deploy-all.ps1                  # all three
+.\scripts\deploy-all.ps1 -Apps webapp     # or just one
+```
+
+Or run them by hand (the `app =` line in each config sets the target app):
+
+```powershell
+flyctl deploy --config fly.toml
+flyctl deploy --config fly.webapp.toml
+flyctl deploy --config fly.grafana.toml
 ```
 
 The webapp reaches the middleware over Fly's private network — `fly.webapp.toml`
