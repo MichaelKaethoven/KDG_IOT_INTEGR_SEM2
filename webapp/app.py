@@ -76,6 +76,12 @@ def create_app() -> Flask:
     # The proxy forwards Grafana's own API calls (JSON POSTs etc.); CSRF is
     # enforced on the portal's own forms, not on proxied Grafana traffic.
     csrf.exempt(grafana_bp)
+    # A single Grafana dashboard load fans out into dozens of proxied sub-requests
+    # (JS bundles, datasource queries, the auto-refresh), so the global 200/day
+    # default limit is exhausted almost immediately ("Too Many Requests"). The
+    # proxy is already gated by login_required, so it is not an open abuse vector —
+    # exempt it from rate limiting; the portal's own routes keep the default.
+    limiter.exempt(grafana_bp)
 
     @app.after_request
     def _security_headers(resp):
