@@ -85,17 +85,26 @@ def index():
     # Same-origin proxy path (see blueprints/grafana_proxy.py). Grafana is not
     # publicly reachable; the proxy is login-gated and re-pins var-customer for
     # customer-scoped sessions, so the iframe can't be used to view other data.
-    params = urlencode({
-        "var-customer": customer_id,
-        "var-order_var": order_id,
-        "var-tracker": tracker_id,
-        "var-view": view,
-        "from": TIME_RANGE_FROM[time_range],
-        "to": "now",
-        "kiosk": "",
-        "theme": "light",
-    })
-    iframe_src = f"/grafana/d/tracker-locations/tracker-dashboard?{params}"
+    # Embed each panel on its own via the `d-solo` route, which renders a single
+    # panel with no Grafana chrome (no nav, no other panels) — unlike
+    # `d/...?kiosk`, which shows the whole dashboard. The shared filter/time vars
+    # apply to both. panelId 1 = "Tracker Locations" geomap, 2 = "Tracker
+    # Details" table (see grafana/provisioning/dashboards/trackers.json).
+    def solo_src(panel_id: str) -> str:
+        params = urlencode({
+            "panelId": panel_id,
+            "var-customer": customer_id,
+            "var-order_var": order_id,
+            "var-tracker": tracker_id,
+            "var-view": view,
+            "from": TIME_RANGE_FROM[time_range],
+            "to": "now",
+            "theme": "light",
+        })
+        return f"/grafana/d-solo/tracker-locations/tracker-dashboard?{params}"
+
+    iframe_src = solo_src("1")
+    table_src = solo_src("2")
 
     return render_template(
         "dashboard.html",
@@ -109,5 +118,6 @@ def index():
         selected_range=time_range,
         time_range_options=TIME_RANGE_OPTIONS,
         iframe_src=iframe_src,
+        table_src=table_src,
         customer_locked=bool(scope_id),
     )

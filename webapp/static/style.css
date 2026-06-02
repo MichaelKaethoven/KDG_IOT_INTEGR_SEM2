@@ -40,8 +40,12 @@ iframe {
 }
 
 .dashboard-frame iframe {
-  height: calc(100vh - 200px);
-  min-height: 520px;
+  height: 60vh;
+  min-height: 420px;
+}
+.dashboard-table-frame iframe {
+  height: 340px;
+  min-height: 260px;
 }
 .dashboard-spinner {
   position: absolute;

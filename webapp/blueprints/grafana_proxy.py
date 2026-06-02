@@ -37,7 +37,11 @@ def proxy(subpath: str):
         args.append(("var-customer", scope_id))
     query = urlencode(args)
 
-    target = f"{GRAFANA_INTERNAL_URL}/{subpath}"
+    # Grafana runs with GF_SERVER_SERVE_FROM_SUB_PATH=true, so it registers every
+    # route under /grafana/ and expects the prefix to survive the proxy hop. If we
+    # forwarded the bare subpath, Grafana would 302 back to /grafana/... and the
+    # browser would loop (ERR_TOO_MANY_REDIRECTS). Keep the prefix intact.
+    target = f"{GRAFANA_INTERNAL_URL}/grafana/{subpath}"
     if query:
         target = f"{target}?{query}"
 
