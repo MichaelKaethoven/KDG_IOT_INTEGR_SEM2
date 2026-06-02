@@ -37,6 +37,45 @@ def current_customer_id():
     return None
 
 
+def _staff_login_ids() -> dict:
+    """Map of configured staff login_id (lower-cased) -> role.
+
+    Read at request time so env changes/tests apply without re-import, mirroring
+    how the password hashes are read below. Defaults are the demo identifiers.
+    """
+    return {
+        os.environ.get("ADMIN_LOGIN_ID", "admin@demo.local").strip().lower(): "admin",
+        os.environ.get("USER_LOGIN_ID", "user@demo.local").strip().lower(): "user",
+    }
+
+
+def _match_staff(login_id: str, password: str):
+    """Resolve a staff login to 'admin'/'user', or None.
+
+    Staff may sign in with their configured login_id (admin@demo.local /
+    user@demo.local by default) or leave the field blank — the legacy path, kept
+    working because there is only ever one of each role. Either way the password
+    is checked against that role's env-configured hash. Staff identifiers take
+    precedence over customer login_ids, so they are effectively reserved.
+    """
+    hashes = {
+        "admin": os.environ.get("ADMIN_PASSWORD_HASH", ""),
+        "user": os.environ.get("USER_PASSWORD_HASH", ""),
+    }
+    lid = login_id.strip().lower()
+    if not lid:
+        # Blank login_id: match by password alone against either staff hash.
+        if check_password_hash(hashes["admin"], password):
+            return "admin"
+        if check_password_hash(hashes["user"], password):
+            return "user"
+        return None
+    role = _staff_login_ids().get(lid)
+    if role and check_password_hash(hashes[role], password):
+        return role
+    return None
+
+
 def _lookup_customer(login_id: str):
     """Resolve a customer by their explicit login_id (one indexed lookup).
 
@@ -86,16 +125,12 @@ def login():
         login_id = (request.form.get("login_id") or "").strip()
         password = request.form.get("password", "")
 
-        if not login_id:
-            # Staff logins use the env-configured admin/user passwords; no
-            # identifier required because there's only one of each.
-            if check_password_hash(os.environ.get("ADMIN_PASSWORD_HASH", ""), password):
-                session["role"] = "admin"
-            elif check_password_hash(os.environ.get("USER_PASSWORD_HASH", ""), password):
-                session["role"] = "user"
-            else:
-                error = "Invalid credentials."
-        else:
+        # Staff first (explicit login_id or blank legacy path); a submitted
+        # login_id that isn't a staff account falls through to customer lookup.
+        staff_role = _match_staff(login_id, password)
+        if staff_role:
+            session["role"] = staff_role
+        elif login_id:
             customer = _lookup_customer(login_id)
             if customer and customer["password_hash"] \
                     and check_password_hash(customer["password_hash"], password):
@@ -104,6 +139,8 @@ def login():
                 session["customer_name"] = customer["name"]
             else:
                 error = "Invalid credentials."
+        else:
+            error = "Invalid credentials."
 
         if "role" in session:
             session.permanent = True
