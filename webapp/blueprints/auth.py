@@ -2,6 +2,7 @@ import os
 from functools import wraps
 from urllib.parse import urlparse
 from flask import Blueprint, render_template, request, session, redirect, url_for, abort
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 from extensions import limiter
 from db import get_db
@@ -36,49 +37,78 @@ def current_customer_id():
     return None
 
 
-def _match_customer_password(password: str):
-    """SECURITY NOTE: intentionally insecure password-only customer login.
-    Walks every customer with a password_hash and returns the first match.
-    Two customers MUST NOT share a password. Not for production use.
+def _lookup_customer(login_id: str):
+    """Resolve a customer by their explicit login_id (one indexed lookup).
+
+    Replaces the legacy password-only scan that walked every customers row and
+    silently cross-authenticated on hash collisions (see plan 10.5).
     """
-    if not password:
+    if not login_id:
         return None
     db = get_db()
     rows = (
         db.table("customers")
         .select("id, name, password_hash")
-        .not_.is_("password_hash", "null")
+        .eq("login_id", login_id)
+        .limit(1)
         .execute()
         .data
     )
-    for row in rows:
-        if row["password_hash"] and check_password_hash(row["password_hash"], password):
-            return row
-    return None
+    return rows[0] if rows else None
+
+
+def _is_safe_next(next_url: str) -> bool:
+    """Allow only same-origin relative paths. Blocks //evil.com, /\\evil.com,
+    and any URL with a netloc (covers absolute URLs)."""
+    if not next_url:
+        return False
+    if not next_url.startswith("/") or next_url.startswith("//") or next_url.startswith("/\\"):
+        return False
+    parsed = urlparse(next_url)
+    return not parsed.netloc and not parsed.scheme
+
+
+def _login_key():
+    """Rate-limit key: per-IP + submitted login_id, so brute force against one
+    account doesn't burn another's quota and an attacker can't bypass by
+    rotating identifiers from the same IP."""
+    ip = get_remote_address() or "?"
+    login_id = (request.form.get("login_id") or "").strip().lower() if request.method == "POST" else ""
+    return f"{ip}|{login_id}"
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute")
+@limiter.limit("5 per minute", key_func=_login_key, methods=["POST"])
 def login():
     error = None
     if request.method == "POST":
+        login_id = (request.form.get("login_id") or "").strip()
         password = request.form.get("password", "")
-        if check_password_hash(os.environ.get("ADMIN_PASSWORD_HASH", ""), password):
-            session["role"] = "admin"
-        elif check_password_hash(os.environ.get("USER_PASSWORD_HASH", ""), password):
-            session["role"] = "user"
+
+        if not login_id:
+            # Staff logins use the env-configured admin/user passwords; no
+            # identifier required because there's only one of each.
+            if check_password_hash(os.environ.get("ADMIN_PASSWORD_HASH", ""), password):
+                session["role"] = "admin"
+            elif check_password_hash(os.environ.get("USER_PASSWORD_HASH", ""), password):
+                session["role"] = "user"
+            else:
+                error = "Invalid credentials."
         else:
-            customer = _match_customer_password(password)
-            if customer:
+            customer = _lookup_customer(login_id)
+            if customer and customer["password_hash"] \
+                    and check_password_hash(customer["password_hash"], password):
                 session["role"] = "customer"
                 session["customer_id"] = customer["id"]
                 session["customer_name"] = customer["name"]
             else:
-                error = "Invalid password."
+                error = "Invalid credentials."
 
         if "role" in session:
+            session.permanent = True
             next_url = request.args.get("next", "")
-            if not next_url or urlparse(next_url).netloc:
+            if not _is_safe_next(next_url):
                 next_url = url_for("dashboard.index")
             return redirect(next_url)
 

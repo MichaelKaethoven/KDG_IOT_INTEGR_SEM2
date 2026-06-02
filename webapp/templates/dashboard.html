@@ -107,9 +107,19 @@
 </div>
 
 <div class="card shadow-sm dashboard-frame">
-  <div class="card-body p-0">
+  <div class="card-body p-0 position-relative">
+    {# Spinner sits behind the iframe; the iframe covers it once it paints. #}
+    <div class="dashboard-spinner d-flex flex-column align-items-center justify-content-center text-muted"
+         aria-hidden="true">
+      <div class="spinner-border text-primary" role="status"></div>
+      <small class="mt-2">Loading map…</small>
+    </div>
     <iframe src="{{ iframe_src }}" frameborder="0"
-            style="border-radius:.375rem;display:block;width:100%"></iframe>
+            title="Tracker map"
+            loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            referrerpolicy="no-referrer"
+            style="border-radius:.375rem;display:block;width:100%;position:relative;z-index:1"></iframe>
   </div>
 </div>
 

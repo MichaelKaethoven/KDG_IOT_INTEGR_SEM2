@@ -6,10 +6,14 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from blueprints.auth import login_required, admin_required, current_customer_id
 from db import get_db
 from settings_store import get_setting
+from pagination import parse_page, build_pagination
+
+_TRACKER_COLS = "id, device_name, serial_number, notes, created_at"
 
 trackers_bp = Blueprint("trackers", __name__)
 
 MIDDLEWARE_URL = os.environ.get("MIDDLEWARE_URL", "http://middleware:5500")
+DEVICE_API_TOKEN = os.environ.get("DEVICE_API_TOKEN", "")
 
 
 def _is_stale(last_seen_iso, cutoff) -> bool:
@@ -44,40 +48,47 @@ def list_trackers():
                   and a["order"]["customer"]["id"] == scope_id]
     assignment_map = {a["tracker_id"]: a["order"] for a in active}
 
+    offset, last_idx, page_size = parse_page()
     if scope_id:
         # Customer sees only trackers currently assigned to one of their orders.
         scoped_ids = list(assignment_map.keys())
         if scoped_ids:
             trackers = (
                 db.table("trackers")
-                .select("*")
+                .select(_TRACKER_COLS)
                 .in_("id", scoped_ids)
                 .order("device_name")
+                .range(offset, last_idx)
                 .execute()
                 .data
             )
         else:
             trackers = []
     else:
-        trackers = db.table("trackers").select("*").order("device_name").execute().data
+        trackers = (
+            db.table("trackers")
+            .select(_TRACKER_COLS)
+            .order("device_name")
+            .range(offset, last_idx)
+            .execute()
+            .data
+        )
 
-    # One round-trip: pull all rows for these device_names ordered by time desc,
-    # then keep the latest per device_name in Python.
+    # One row per device via the latest_device_locations view (DISTINCT ON in
+    # SQL). Avoids dragging the full device_locations history through the wire
+    # just to keep the newest per device. See db/migrations/006.
     device_names = [t["device_name"] for t in trackers]
     last_seen: dict = {}
     if device_names:
         locs = (
-            db.table("device_locations")
+            db.table("latest_device_locations")
             .select("device_name, time")
             .in_("device_name", device_names)
-            .order("time", desc=True)
             .execute()
             .data
         )
         for row in locs:
-            name = row["device_name"]
-            if name not in last_seen:
-                last_seen[name] = row["time"]
+            last_seen[row["device_name"]] = row["time"]
 
     stale_hours = get_setting("tracker_stale_hours")
     cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
@@ -99,6 +110,7 @@ def list_trackers():
         stale_hours=stale_hours,
         stale_count=stale_count,
         show_stale_only=show_stale_only,
+        pagination=build_pagination(page_size, len(trackers)),
     )
 
 
@@ -179,8 +191,9 @@ def delete_tracker(tracker_id):
 @trackers_bp.route("/sync", methods=["POST"])
 @admin_required
 def sync_trackers():
+    headers = {"X-Device-Token": DEVICE_API_TOKEN} if DEVICE_API_TOKEN else {}
     try:
-        resp = requests.get(f"{MIDDLEWARE_URL}/devicelist", timeout=60)
+        resp = requests.get(f"{MIDDLEWARE_URL}/devicelist", timeout=60, headers=headers)
         resp.raise_for_status()
         devices = resp.json().get("devices", [])
     except requests.RequestException as e:

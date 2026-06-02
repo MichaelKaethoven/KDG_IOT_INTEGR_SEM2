@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, current_app, request
+from urllib.parse import urlencode
+
+from flask import Blueprint, render_template, request
 from blueprints.auth import login_required, current_customer_id
 from db import get_db
 
@@ -80,16 +82,20 @@ def index():
     else:
         trackers = []
 
-    grafana_url = current_app.config["GRAFANA_URL"]
-    iframe_src = (
-        f"{grafana_url}/d/tracker-locations/tracker-dashboard"
-        f"?var-customer={customer_id}"
-        f"&var-order_var={order_id}"
-        f"&var-tracker={tracker_id}"
-        f"&var-view={view}"
-        f"&from={TIME_RANGE_FROM[time_range]}&to=now"
-        f"&kiosk&theme=light"
-    )
+    # Same-origin proxy path (see blueprints/grafana_proxy.py). Grafana is not
+    # publicly reachable; the proxy is login-gated and re-pins var-customer for
+    # customer-scoped sessions, so the iframe can't be used to view other data.
+    params = urlencode({
+        "var-customer": customer_id,
+        "var-order_var": order_id,
+        "var-tracker": tracker_id,
+        "var-view": view,
+        "from": TIME_RANGE_FROM[time_range],
+        "to": "now",
+        "kiosk": "",
+        "theme": "light",
+    })
+    iframe_src = f"/grafana/d/tracker-locations/tracker-dashboard?{params}"
 
     return render_template(
         "dashboard.html",

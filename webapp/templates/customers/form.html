@@ -21,24 +21,33 @@
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
-        <label class="form-label">Name <span class="text-danger">*</span></label>
-        <input type="text" name="name" class="form-control" value="{{ customer.name if customer else '' }}" required>
+        <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+        <input id="name" type="text" name="name" class="form-control" value="{{ customer.name if customer else '' }}" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input type="email" name="email" class="form-control" value="{{ customer.email if customer else '' }}">
+        <label for="email" class="form-label">Email</label>
+        <input id="email" type="email" name="email" class="form-control" value="{{ customer.email if customer else '' }}">
       </div>
       <div class="mb-3">
-        <label class="form-label">Phone</label>
-        <input type="tel" name="phone" class="form-control" value="{{ customer.phone if customer else '' }}">
+        <label for="phone" class="form-label">Phone</label>
+        <input id="phone" type="tel" name="phone" class="form-control" value="{{ customer.phone if customer else '' }}">
       </div>
       <div class="mb-3">
-        <label class="form-label">Portal password</label>
-        <input type="password" name="password" class="form-control" autocomplete="new-password"
+        <label for="login_id" class="form-label">Portal login ID</label>
+        <input id="login_id" type="text" name="login_id" class="form-control"
+               value="{{ customer.login_id if customer and customer.login_id else '' }}"
+               autocomplete="off"
+               placeholder="e.g. acme — unique account name the customer types to sign in">
+        <div class="form-text">
+          The customer enters this in the <em>Account</em> field on the login page. Leave blank to disable portal access for this customer.
+        </div>
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">Portal password</label>
+        <input id="password" type="password" name="password" class="form-control" autocomplete="new-password"
                placeholder="{% if customer %}Leave blank to keep current password{% else %}Set a password for this customer to log in{% endif %}">
         <div class="form-text">
-          If set, this customer can log in with this password and see only their orders and trackers.
-          <span class="text-danger">Insecure by design — passwords must be unique across customers.</span>
+          Paired with the Login ID above. This customer will see only their own orders and trackers.
         </div>
       </div>
       <div class="mb-3">

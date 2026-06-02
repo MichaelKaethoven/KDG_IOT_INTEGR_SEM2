@@ -21,8 +21,16 @@
         <form method="post">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input type="password" name="password" class="form-control" autofocus required>
+            <label for="login_id" class="form-label">Account</label>
+            <input id="login_id" type="text" name="login_id" class="form-control"
+                   autocomplete="username" autofocus
+                   placeholder="Leave blank for staff login">
+            <div class="form-text">Customers: your account name. Staff: leave blank.</div>
+          </div>
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" type="password" name="password" class="form-control"
+                   autocomplete="current-password" required>
           </div>
           <button type="submit" class="btn btn-dark w-100">Sign in</button>
         </form>

@@ -1,11 +1,12 @@
 import os
 import json
 import time
+import hmac
 import threading
 import argparse
 
 import paho.mqtt.client as mqtt
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 from location_fetcher import fetch_all_locations, fetch_device_list
 from settings import load_runtime_settings
@@ -14,6 +15,12 @@ app = Flask(__name__)
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 300))
 PORT = int(os.environ.get("PORT", 5500))
+
+# Shared secret for the device endpoints. These expose live geolocation, so they
+# must never be public. Network isolation (no public Fly service) is the primary
+# defence; this token is defence-in-depth for internal/org callers. When unset
+# (local dev) the check is skipped so `python runtime/middleware.py` stays simple.
+DEVICE_API_TOKEN = os.environ.get("DEVICE_API_TOKEN", "")
 
 MQTT_HOST     = os.environ.get("MQTT_HOST", "")
 MQTT_PORT     = int(os.environ.get("MQTT_PORT", 8883))
@@ -34,6 +41,16 @@ def _connect_mqtt() -> mqtt.Client | None:
     if not MQTT_HOST:
         print("[mqtt] MQTT_HOST not set — skipping")
         return None
+    # Refuse to publish to a configured broker with empty credentials: HiveMQ
+    # Cloud and most hosted brokers reject anonymous, but a misconfigured local
+    # broker can silently accept and publicly expose every device's coordinates.
+    # Fail fast so the polling loop doesn't push to the wrong place.
+    if not MQTT_USER or not MQTT_PASSWORD:
+        raise RuntimeError(
+            "[mqtt] MQTT_HOST is set but MQTT_USER/MQTT_PASSWORD are empty — refusing to "
+            "connect anonymously to avoid leaking device locations. Set credentials or "
+            "unset MQTT_HOST."
+        )
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
     client.tls_set()
@@ -103,8 +120,16 @@ if os.environ.get("MIDDLEWARE_AUTOSTART", "1") == "1":
     _start_background_workers()
 
 
+def _authorized() -> bool:
+    if not DEVICE_API_TOKEN:
+        return True
+    return hmac.compare_digest(request.headers.get("X-Device-Token", ""), DEVICE_API_TOKEN)
+
+
 @app.route("/devices")
 def devices():
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
     with _cache_lock:
         return jsonify({
             "last_poll": _last_poll,
@@ -114,6 +139,8 @@ def devices():
 
 @app.route("/devicelist")
 def devicelist():
+    if not _authorized():
+        return jsonify({"error": "unauthorized"}), 401
     try:
         devices = fetch_device_list()
     except Exception as e:

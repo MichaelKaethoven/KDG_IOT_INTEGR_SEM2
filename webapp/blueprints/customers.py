@@ -1,7 +1,19 @@
-from flask import Blueprint, render_template, request, redirect, url_for, abort
+from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
 from werkzeug.security import generate_password_hash
 from blueprints.auth import login_required, admin_required, current_customer_id
 from db import get_db
+from pagination import parse_page, build_pagination
+
+# Columns we expose to templates. Explicitly excludes `password_hash` so the
+# hash never reaches the browser via a list/detail response.
+_CUSTOMER_COLS = "id, name, email, phone, color_idx, login_id, created_at"
+
+
+def _clean_login_id(raw: str | None) -> str | None:
+    """Normalize: trim, collapse to None when blank. Case is preserved so
+    operators can choose readable IDs (e.g. 'Acme-EU')."""
+    value = (raw or "").strip()
+    return value or None
 
 customers_bp = Blueprint("customers", __name__)
 
@@ -39,10 +51,11 @@ def list_customers():
         return redirect(url_for("customers.customer_detail", customer_id=scope_id))
 
     search = request.args.get("q", "").strip()
-    query = db.table("customers").select("*").order("name")
+    offset, last_idx, page_size = parse_page()
+    query = db.table("customers").select(_CUSTOMER_COLS).order("name")
     if search:
         query = query.ilike("name", f"%{search}%")
-    customers = query.execute().data
+    customers = query.range(offset, last_idx).execute().data
 
     # One round-trip: pull every active order_tracker with its order's customer_id.
     active = (
@@ -64,6 +77,7 @@ def list_customers():
         customers=customers,
         search=search,
         palette=CUSTOMER_PALETTE,
+        pagination=build_pagination(page_size, len(customers)),
     )
 
 
@@ -72,11 +86,18 @@ def list_customers():
 def new_customer():
     if request.method == "POST":
         db = get_db()
+        login_id = _clean_login_id(request.form.get("login_id"))
+        if login_id and _login_id_taken(db, login_id, exclude_id=None):
+            flash(f"Login ID '{login_id}' is already in use.", "danger")
+            return render_template(
+                "customers/form.html", customer=None, palette=CUSTOMER_PALETTE,
+            ), 400
         payload = {
             "name": request.form["name"],
             "email": request.form.get("email") or None,
             "phone": request.form.get("phone") or None,
             "color_idx": _parse_color_idx(request.form.get("color_idx")),
+            "login_id": login_id,
         }
         new_password = request.form.get("password", "").strip()
         if new_password:
@@ -84,6 +105,14 @@ def new_customer():
         db.table("customers").insert(payload).execute()
         return redirect(url_for("customers.list_customers"))
     return render_template("customers/form.html", customer=None, palette=CUSTOMER_PALETTE)
+
+
+def _login_id_taken(db, login_id: str, exclude_id: str | None) -> bool:
+    query = db.table("customers").select("id").eq("login_id", login_id).limit(1)
+    rows = query.execute().data
+    if not rows:
+        return False
+    return rows[0]["id"] != exclude_id
 
 
 @customers_bp.route("/<customer_id>")
@@ -94,7 +123,7 @@ def customer_detail(customer_id):
         abort(403)
 
     db = get_db()
-    customer = db.table("customers").select("*").eq("id", customer_id).single().execute().data
+    customer = db.table("customers").select(_CUSTOMER_COLS).eq("id", customer_id).single().execute().data
     orders = (
         db.table("orders")
         .select("*")
@@ -133,13 +162,20 @@ def customer_detail(customer_id):
 @admin_required
 def edit_customer(customer_id):
     db = get_db()
-    customer = db.table("customers").select("*").eq("id", customer_id).single().execute().data
+    customer = db.table("customers").select(_CUSTOMER_COLS).eq("id", customer_id).single().execute().data
     if request.method == "POST":
+        login_id = _clean_login_id(request.form.get("login_id"))
+        if login_id and _login_id_taken(db, login_id, exclude_id=customer_id):
+            flash(f"Login ID '{login_id}' is already in use.", "danger")
+            return render_template(
+                "customers/form.html", customer=customer, palette=CUSTOMER_PALETTE,
+            ), 400
         payload = {
             "name": request.form["name"],
             "email": request.form.get("email") or None,
             "phone": request.form.get("phone") or None,
             "color_idx": _parse_color_idx(request.form.get("color_idx")),
+            "login_id": login_id,
         }
         new_password = request.form.get("password", "").strip()
         if new_password:

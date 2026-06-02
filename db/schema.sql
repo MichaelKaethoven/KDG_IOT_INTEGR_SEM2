@@ -24,8 +24,14 @@ create table if not exists customers (
     color_idx     smallint    not null default 0,
     -- Optional per-customer portal password (Werkzeug hash). DEMO USE ONLY — see
     -- the SECURITY note in db/migrations/002_add_customer_password.sql.
-    password_hash text
+    password_hash text,
+    -- Customer-facing login identifier paired with password_hash. NULL for
+    -- customers without portal access; unique (case-sensitive) when set.
+    login_id      text
 );
+create unique index if not exists customers_login_id_uniq
+    on customers (login_id) where login_id is not null;
+create index if not exists customers_name_idx on customers(name);
 
 -- Orders --------------------------------------------------------------------
 create table if not exists orders (
@@ -38,6 +44,7 @@ create table if not exists orders (
     created_at  timestamptz not null default now()
 );
 create index if not exists orders_customer_id_idx on orders(customer_id);
+create index if not exists orders_status_idx       on orders(status);
 
 -- Trackers ------------------------------------------------------------------
 create table if not exists trackers (
@@ -48,7 +55,8 @@ create table if not exists trackers (
     notes         text,
     created_at    timestamptz not null default now()
 );
-create index if not exists trackers_device_name_idx on trackers(device_name);
+create index if not exists trackers_device_name_idx   on trackers(device_name);
+create index if not exists trackers_serial_number_idx  on trackers(serial_number);
 
 -- Order <-> Tracker assignments (a tracker is "released" by setting removed_at) -
 create table if not exists order_trackers (
@@ -60,6 +68,11 @@ create table if not exists order_trackers (
 );
 create index if not exists order_trackers_order_id_idx   on order_trackers(order_id);
 create index if not exists order_trackers_tracker_id_idx on order_trackers(tracker_id);
+-- Partial index for the "active assignment" filter (removed_at is null), used
+-- by every list view that joins/aggregates on currently-assigned trackers.
+create index if not exists order_trackers_active_idx
+    on order_trackers(removed_at)
+    where removed_at is null;
 
 -- Device location history (written by runtime/subscriber.py) ----------------
 create table if not exists device_locations (
@@ -77,6 +90,14 @@ create table if not exists device_locations (
 );
 create index if not exists device_locations_device_time_idx
     on device_locations(device_name, time desc);
+
+-- Latest fix per device. The webapp queries this instead of the raw history
+-- table on list views so it doesn't drag the full history into memory.
+create or replace view latest_device_locations as
+select distinct on (device_name)
+    device_name, time, lat, lon, accuracy
+from device_locations
+order by device_name, time desc;
 
 -- Tracker condition log (timeline of dated free-text entries per tracker) ----
 -- Separate from the single trackers.notes description field: this is an

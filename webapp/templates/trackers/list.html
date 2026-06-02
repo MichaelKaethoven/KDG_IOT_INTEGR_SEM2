@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import fmt_datetime %}
 {% block title %}Trackers{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -6,10 +7,10 @@
   {% if session.role == 'admin' %}
     <form method="post" action="{{ url_for('trackers.sync_trackers') }}"
           class="ms-auto d-inline"
-          onsubmit="return confirm('Fetch the device list from Google Find Hub and upsert all devices into the trackers table?');">
+          onsubmit="if(!confirm('Fetch the device list from Google Find Hub and upsert all devices into the trackers table?'))return false;var b=this.querySelector('button');b.disabled=true;b.querySelector('.sync-label').textContent=' Syncing…';b.querySelector('.sync-icon').classList.replace('bi-cloud-download','spinner-border');b.querySelector('.sync-icon').classList.add('spinner-border-sm');return true;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-cloud-download"></i> Sync from Google
+        <i class="bi bi-cloud-download sync-icon" role="status"></i><span class="sync-label"> Sync from Google</span>
       </button>
     </form>
     <a href="{{ url_for('trackers.new_tracker') }}" class="btn btn-sm btn-dark">
@@ -36,15 +37,26 @@
     <table class="table table-hover mb-0 align-middle">
       <thead class="table-dark">
         <tr>
-          <th>Device name</th><th>Serial</th>
-          <th>Status</th><th>With customer</th><th>In order</th>
-          <th>Last seen at</th><th></th>
+          <th scope="col">Device name</th>
+          <th scope="col">Serial</th>
+          <th scope="col">Status</th>
+          <th scope="col">With customer</th>
+          <th scope="col">In order</th>
+          <th scope="col">Last seen at</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
       </thead>
       <tbody>
         {% for t in trackers %}
         <tr class="{{ 'table-danger' if t.stale }}">
-          <td class="font-monospace">{{ t.device_name }}</td>
+          <td class="font-monospace">
+            {% if t.stale %}
+              <i class="bi bi-exclamation-triangle-fill text-danger me-1"
+                 title="No ping in over {{ stale_hours }}h"
+                 aria-label="Stale: no ping in over {{ stale_hours }}h"></i>
+            {% endif %}
+            {{ t.device_name }}
+          </td>
           <td>{{ t.serial_number or '—' }}</td>
           <td>
             {% if t.assignment %}
@@ -67,7 +79,7 @@
           </td>
           <td>
             {% if t.last_seen %}
-              {{ t.last_seen[:19].replace('T',' ') }}
+              {{ fmt_datetime(t.last_seen) }}
               {% if t.stale %}
                 <span class="badge bg-danger ms-1" title="No ping in over {{ stale_hours }}h">stale</span>
               {% endif %}
@@ -104,4 +116,5 @@
     </table>
   </div>
 </div>
+{% include '_pagination.html' %}
 {% endblock %}

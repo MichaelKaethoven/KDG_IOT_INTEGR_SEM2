@@ -2,6 +2,11 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from blueprints.auth import login_required, admin_required, current_customer_id
 from db import get_db
+from pagination import parse_page, build_pagination
+
+_ORDER_COLS = "id, customer_id, status, quantity, order_date, notes, created_at"
+# Side-loaded customer fields. Explicit so password_hash never tags along.
+_ORDER_CUSTOMER_COLS = "id, name, email, phone, color_idx"
 
 
 def _parse_quantity(raw):
@@ -42,12 +47,17 @@ def list_orders():
     customer_id = scope_id or request.args.get("customer", "")
     status = request.args.get("status", "")
 
-    query = db.table("orders").select("*, customer:customers(id, name)").order("order_date", desc=True)
+    offset, last_idx, page_size = parse_page()
+    query = (
+        db.table("orders")
+        .select(f"{_ORDER_COLS}, customer:customers(id, name)")
+        .order("order_date", desc=True)
+    )
     if customer_id:
         query = query.eq("customer_id", customer_id)
     if status:
         query = query.eq("status", status)
-    orders = query.execute().data
+    orders = query.range(offset, last_idx).execute().data
 
     # One round-trip for all active assignments, grouped in Python.
     active = (
@@ -72,6 +82,7 @@ def list_orders():
         selected_customer=customer_id,
         selected_status=status,
         statuses=STATUSES,
+        pagination=build_pagination(page_size, len(orders)),
     )
 
 
@@ -107,7 +118,7 @@ def order_detail(order_id):
     db = get_db()
     order = (
         db.table("orders")
-        .select("*, customer:customers(*)")
+        .select(f"{_ORDER_COLS}, customer:customers({_ORDER_CUSTOMER_COLS})")
         .eq("id", order_id)
         .single()
         .execute()
@@ -126,18 +137,24 @@ def order_detail(order_id):
         .data
     )
 
-    for a in assignments:
-        device_name = a["tracker"]["device_name"]
-        loc = (
-            db.table("device_locations")
-            .select("lat, lon, time")
-            .eq("device_name", device_name)
-            .order("time", desc=True)
-            .limit(1)
+    # One round-trip via the latest_device_locations view for all assigned
+    # trackers. Avoids one query per assignment (was N+1). See plan 10.7.
+    device_names = [a["tracker"]["device_name"] for a in assignments if a.get("tracker")]
+    latest_by_device: dict = {}
+    if device_names:
+        locs = (
+            db.table("latest_device_locations")
+            .select("device_name, lat, lon, time")
+            .in_("device_name", device_names)
             .execute()
             .data
         )
-        a["last_location"] = loc[0] if loc else None
+        for row in locs:
+            latest_by_device[row["device_name"]] = {
+                "lat": row["lat"], "lon": row["lon"], "time": row["time"],
+            }
+    for a in assignments:
+        a["last_location"] = latest_by_device.get(a["tracker"]["device_name"]) if a.get("tracker") else None
 
     # Available trackers: not currently assigned anywhere
     all_trackers = db.table("trackers").select("*").order("device_name").execute().data
@@ -213,7 +230,7 @@ def confirm_release(order_id):
 
     order = (
         db.table("orders")
-        .select("*, customer:customers(id, name)")
+        .select(f"{_ORDER_COLS}, customer:customers(id, name)")
         .eq("id", order_id)
         .single()
         .execute()

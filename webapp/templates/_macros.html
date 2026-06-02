@@ -1,0 +1,33 @@
+{# Shared UI fragments. Imported with: {% from "_macros.html" import status_badge, progress_bar, fmt_datetime, fmt_date %} #}
+
+{# Bootstrap badge for an order status — colour comes from the status itself. #}
+{% macro status_badge(status) -%}
+<span class="badge
+  {%- if status == 'active' %} bg-success
+  {%- elif status == 'pending' %} bg-warning text-dark
+  {%- elif status == 'completed' %} bg-secondary
+  {%- else %} bg-danger
+  {%- endif %}">{{ status }}</span>
+{%- endmacro %}
+
+{# Slim progress bar + numeric "done/total" sublabel for order fulfillment.
+   `width` is the bar width (e.g. "80px" for list rows, "100%" for cards). #}
+{% macro progress_bar(done, total, width="80px", height="6px") -%}
+{% set pct = (done / total * 100) if total > 0 else 0 %}
+<div class="progress" style="height:{{ height }};width:{{ width }}">
+  <div class="progress-bar bg-success" role="progressbar"
+       aria-valuenow="{{ done }}" aria-valuemin="0" aria-valuemax="{{ total }}"
+       style="width:{{ [pct, 100] | min }}%"></div>
+</div>
+<small>{{ done }}/{{ total }}</small>
+{%- endmacro %}
+
+{# Render an ISO timestamp as "YYYY-MM-DD HH:MM:SS UTC". Backend stores UTC. #}
+{% macro fmt_datetime(value, fallback='—') -%}
+{% if value %}{{ value[:19].replace('T',' ') }} <span class="text-muted small">UTC</span>{% else %}{{ fallback }}{% endif %}
+{%- endmacro %}
+
+{# Render only the date portion of an ISO timestamp. #}
+{% macro fmt_date(value, fallback='—') -%}
+{% if value %}{{ value[:10] }}{% else %}{{ fallback }}{% endif %}
+{%- endmacro %}

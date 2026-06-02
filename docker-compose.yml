@@ -1,8 +1,11 @@
 services:
   middleware:
     build: .
+    # Bind to localhost only — the middleware exposes live geolocation and must
+    # not be reachable from the LAN. The webapp reaches it over the compose
+    # network as http://middleware:5500 regardless of this host mapping.
     ports:
-      - "5500:5500"
+      - "127.0.0.1:5500:5500"
     volumes:
       - ./libs/Auth:/app/libs/Auth
     environment:
@@ -15,6 +18,7 @@ services:
       - MQTT_USER=${MQTT_USER}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
       - MQTT_TOPIC=${MQTT_TOPIC:-findmy/devices}
+      - DEVICE_API_TOKEN=${DEVICE_API_TOKEN:-}
       # Read by the middleware to pick up live Settings-page changes from the
       # app_settings table. Optional — falls back to the env defaults above.
       - SUPABASE_URL=${SUPABASE_URL}
@@ -49,22 +53,30 @@ services:
       - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
       - USER_PASSWORD_HASH=${USER_PASSWORD_HASH}
       - WEBAPP_PORT=${WEBAPP_PORT:-8080}
-      - GRAFANA_URL=${GRAFANA_URL:-http://localhost:3000}
+      - GRAFANA_INTERNAL_URL=${GRAFANA_INTERNAL_URL:-http://grafana:3000}
       - MIDDLEWARE_URL=${MIDDLEWARE_URL:-http://middleware:5500}
+      - DEVICE_API_TOKEN=${DEVICE_API_TOKEN:-}
     depends_on:
       - middleware
 
   grafana:
     image: grafana/grafana:11.0.0
+    # Bind admin UI to localhost only. The webapp reaches Grafana over the
+    # compose network at http://grafana:3000 via its login-gated /grafana proxy.
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
     environment:
       - GF_SECURITY_ALLOW_EMBEDDING=true
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Anonymous Viewer is safe here because Grafana is only reached through the
+      # webapp's login-gated /grafana proxy (and localhost for admin).
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_SERVER_ROOT_URL=${WEBAPP_PUBLIC_URL:-http://localhost:8080}/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
       - SUPABASE_DB_HOST=${SUPABASE_DB_HOST}
       - SUPABASE_DB_USER=${SUPABASE_DB_USER}
       - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}

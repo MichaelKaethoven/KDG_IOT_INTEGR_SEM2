@@ -6,26 +6,24 @@ primary_region = 'ams'
 
 [env]
   GF_SECURITY_ALLOW_EMBEDDING      = "true"
-  GF_SECURITY_CONTENT_SECURITY_POLICY = "false"
+  # Anonymous Viewer is acceptable ONLY because Grafana has no public service
+  # below — it is reachable solely via the webapp's login-gated /grafana proxy.
   GF_AUTH_ANONYMOUS_ENABLED        = "true"
   GF_AUTH_ANONYMOUS_ORG_NAME       = "Main Org."
   GF_AUTH_ANONYMOUS_ORG_ROLE       = "Viewer"
+  # Served behind the webapp under /grafana. Set the root URL to your webapp's
+  # public host (confirm the actual domain/custom domain before deploying).
+  GF_SERVER_ROOT_URL               = "https://findmy-webapp.fly.dev/grafana/"
+  GF_SERVER_SERVE_FROM_SUB_PATH    = "true"
 
 [[mounts]]
   source      = 'grafana_data'
   destination = '/var/lib/grafana'
 
-[[services]]
-  protocol      = 'tcp'
-  internal_port = 3000
-
-  [[services.ports]]
-    port     = 80
-    handlers = ['http']
-
-  [[services.ports]]
-    port     = 443
-    handlers = ['tls', 'http']
+# No public [[services]] block: Grafana exposes every customer's location data
+# and must not be internet-reachable. The webapp reaches it over Fly private
+# networking (GRAFANA_INTERNAL_URL = http://findmy-grafana.internal:3000) and is
+# the only authenticated entry point.
 
 [[vm]]
   memory   = '256mb'

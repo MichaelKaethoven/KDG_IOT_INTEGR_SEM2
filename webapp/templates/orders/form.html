@@ -19,8 +19,8 @@
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
-        <label class="form-label">Customer <span class="text-danger">*</span></label>
-        <select name="customer_id" class="form-select" required>
+        <label for="customer_id" class="form-label">Customer <span class="text-danger">*</span></label>
+        <select id="customer_id" name="customer_id" class="form-select" required>
           <option value="">Select customer…</option>
           {% for c in customers %}
             <option value="{{ c.id }}" {% if request.args.get('customer') == c.id %}selected{% endif %}>
@@ -30,20 +30,20 @@
         </select>
       </div>
       <div class="mb-3">
-        <label class="form-label">Quantity <span class="text-danger">*</span></label>
-        <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+        <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+        <input id="quantity" type="number" name="quantity" class="form-control" min="1" value="1" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">Status</label>
-        <select name="status" class="form-select">
+        <label for="status" class="form-label">Status</label>
+        <select id="status" name="status" class="form-select">
           {% for s in statuses %}
             <option value="{{ s }}" {% if s == 'pending' %}selected{% endif %}>{{ s | capitalize }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="mb-3">
-        <label class="form-label">Notes</label>
-        <textarea name="notes" class="form-control" rows="2"></textarea>
+        <label for="notes" class="form-label">Notes</label>
+        <textarea id="notes" name="notes" class="form-control" rows="2"></textarea>
       </div>
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-dark">Create order</button>

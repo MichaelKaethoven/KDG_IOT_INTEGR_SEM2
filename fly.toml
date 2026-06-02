@@ -17,25 +17,20 @@ primary_region = 'ams'
   destination = '/app/auth_data'
   processes = ['middleware']
 
-[[services]]
-  protocol = 'tcp'
-  internal_port = 5500
-  processes = ['middleware']
-
-  [[services.ports]]
-    port = 80
-    handlers = ['http']
-
-  [[services.ports]]
-    port = 443
-    handlers = ['tls', 'http']
-
-  [[services.http_checks]]
+# No public [[services]] block: the middleware exposes live geolocation and must
+# not be internet-reachable. The webapp reaches it over Fly private networking
+# (fly.webapp.toml MIDDLEWARE_URL = http://<app>.internal:5500), which works
+# without a public service. Health is checked at the machine level below.
+[checks]
+  [checks.middleware_health]
+    type = 'http'
+    port = 5500
     interval = '1m0s'
     timeout = '5s'
     grace_period = '10s'
     method = 'GET'
     path = '/healthz'
+    processes = ['middleware']
 
 [[vm]]
   memory = '512mb'

@@ -22,7 +22,11 @@
     <table class="table table-hover mb-0">
       <thead class="table-dark">
         <tr>
-          <th>Name</th><th>Email</th><th>Phone</th><th>Active trackers</th><th></th>
+          <th scope="col">Name</th>
+          <th scope="col">Email</th>
+          <th scope="col">Phone</th>
+          <th scope="col">Active trackers</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -31,7 +35,8 @@
           <td>
             {% set idx = c.color_idx if c.color_idx is not none else 0 %}
             <span class="color-dot" style="background:{{ palette[idx].hex }}"
-                  title="{{ palette[idx].name }}"></span>
+                  title="{{ palette[idx].name }}"
+                  aria-label="Color: {{ palette[idx].name }}"></span>
             <a href="{{ url_for('customers.customer_detail', customer_id=c.id) }}">{{ c.name }}</a>
           </td>
           <td>{{ c.email or '—' }}</td>
@@ -59,4 +64,5 @@
     </table>
   </div>
 </div>
+{% include '_pagination.html' %}
 {% endblock %}

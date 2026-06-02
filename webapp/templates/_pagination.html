@@ -1,0 +1,29 @@
+{% if pagination and (pagination.has_prev or pagination.has_next) %}
+<nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Pagination">
+  <small class="text-muted">Page {{ pagination.page }}</small>
+  <ul class="pagination pagination-sm mb-0">
+    {% set prev_args = pagination.args.copy() %}
+    {% if pagination.has_prev %}
+      {% set _ = prev_args.update({'page': pagination.prev_page}) %}
+      <li class="page-item">
+        <a class="page-link" href="?{{ prev_args|urlencode }}" rel="prev">
+          <i class="bi bi-chevron-left"></i> Prev
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i> Prev</span></li>
+    {% endif %}
+    {% set next_args = pagination.args.copy() %}
+    {% if pagination.has_next %}
+      {% set _ = next_args.update({'page': pagination.next_page}) %}
+      <li class="page-item">
+        <a class="page-link" href="?{{ next_args|urlencode }}" rel="next">
+          Next <i class="bi bi-chevron-right"></i>
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Next <i class="bi bi-chevron-right"></i></span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}

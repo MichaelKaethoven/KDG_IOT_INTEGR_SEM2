@@ -47,8 +47,16 @@ def set_cached_value(name: str, value: str):
     else:
         data = {}
     data[name] = value
-    with open(secrets_file, 'w') as file:
+    # Atomic write: write to a sibling temp file then os.replace into place.
+    # A crash mid-write leaves the previous valid secrets.json intact, which
+    # matters because losing this file forces a full interactive re-login that
+    # cannot run inside a container (see DEPLOYMENT.md).
+    tmp_path = secrets_file + '.tmp'
+    with open(tmp_path, 'w') as file:
         json.dump(data, file)
+        file.flush()
+        os.fsync(file.fileno())
+    os.replace(tmp_path, secrets_file)
 
 
 def _get_secrets_file():

@@ -6,6 +6,7 @@ primary_region = 'ams'
 
 [env]
   MIDDLEWARE_URL = "http://findmy-middleware-dappled-silence-7211.internal:5500"
+  GRAFANA_INTERNAL_URL = "http://findmy-grafana.internal:3000"
 
 [[services]]
   protocol      = 'tcp'

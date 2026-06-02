@@ -291,6 +291,25 @@ by setting the `SECRETS_PATH` secret (see below); then upload your local
 `secrets.json` onto the volume (e.g. via `flyctl ssh sftp shell` or a one-off
 machine) at `/app/auth_data/secrets.json`.
 
+> **⚠ The `auth_data` volume is the single recovery point for Google
+> authentication.** Fly machines have ephemeral filesystems; the volume is the
+> only place `secrets.json` survives a restart or redeploy. Four of the five
+> keys in `secrets.json` (`username`, `aas_token`, `shared_key`, `owner_key`)
+> are write-once seeds produced by the interactive Chrome login in step 4.2,
+> which **cannot run inside a container**. If the volume is lost (manual
+> `volumes destroy`, region failure with no snapshot, etc.) you must regenerate
+> `secrets.json` locally and re-upload it. Fly volumes are encrypted at rest, so
+> app-level encryption is unnecessary; the writes are atomic
+> (`token_cache.set_cached_value` writes-then-rename) so a mid-write crash
+> leaves the previous file intact. **Back the file up after step 4.2** — pull a
+> copy with `flyctl ssh sftp` and keep it in a password manager:
+>
+> ```powershell
+> flyctl ssh sftp shell --app findmy-middleware-...
+> # in the SFTP shell:
+> get /app/auth_data/secrets.json
+> ```
+
 **2. Set secrets** (these are *secrets*, not the plaintext `.env`):
 
 ```powershell
@@ -553,7 +572,9 @@ Google** in the portal.
 | `TRACKER_STALE_HOURS` | webapp | no (24) | Hours without a ping before a tracker is flagged stale (red) in the Trackers list. |
 | `GRAFANA_URL` | webapp | **yes** | Browser-reachable Grafana URL (local: `:3001`). |
 | `MIDDLEWARE_URL` | webapp | no | Where the portal calls `/devicelist`. Docker: `http://middleware:5500`. |
-| `GRAFANA_ADMIN_PASSWORD` | grafana | no (`admin`) | Grafana admin login. |
+| `GRAFANA_ADMIN_PASSWORD` | grafana | **yes** | Grafana admin login. docker-compose refuses to start if unset; generate `python -c "import secrets; print(secrets.token_urlsafe(24))"`. |
+| `SECRET_KEY` | webapp | **yes** | Flask session signing key (32+ bytes). The app rejects short or `change-me…` values in production. Generate `python -c "import secrets; print(secrets.token_hex(32))"`. |
+| `SESSION_COOKIE_SECURE` | webapp | no (`true`) | Set the session cookie's `Secure` flag. Leave true for any HTTPS deploy; set to `false` only for plain-HTTP local dev. |
 | `SECRETS_PATH` | middleware | no | Override path to `secrets.json` (set on Fly to the volume path). |
 
 ---
