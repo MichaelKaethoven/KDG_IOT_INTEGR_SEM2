@@ -12,6 +12,9 @@ class FcmReceiver:
     _listening = False
     _loop = None
     _loop_thread = None
+    # Guards the one-time start of the shared FCM listener against concurrent
+    # registrations (the polling loop fetches device locations in parallel).
+    _start_lock = threading.Lock()
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -45,17 +48,36 @@ class FcmReceiver:
 
         self.credentials = get_cached_value('fcm_credentials')
         self.location_update_callbacks = []
+        self._callbacks_lock = threading.Lock()
         self.pc = FcmPushClient(self._on_notification, fcm_config, self.credentials, self._on_credentials_updated)
 
 
     def register_for_location_updates(self, callback):
-
+        # The FCM listener is a single shared connection. Start it exactly once,
+        # even when many device-location requests register concurrently: starting
+        # it more than once spawns multiple readers on the same socket and corrupts
+        # the connection ("readexactly() called while another coroutine is already
+        # waiting for incoming data"), after which every location request times out.
         if not self._listening:
-            self._start_listener_in_background()
+            with self._start_lock:
+                if not self._listening:
+                    self._start_listener_in_background()
 
-        self.location_update_callbacks.append(callback)
+        with self._callbacks_lock:
+            self.location_update_callbacks.append(callback)
 
         return self.credentials['fcm']['registration']['token']
+
+
+    def unregister_for_location_updates(self, callback):
+        # Callers must unregister once their request resolves; otherwise the shared
+        # callback list grows without bound (every poll cycle registers one callback
+        # per device) and each notification fans out to ever more dead callbacks.
+        with self._callbacks_lock:
+            try:
+                self.location_update_callbacks.remove(callback)
+            except ValueError:
+                pass
 
 
     def stop_listening(self):
@@ -87,7 +109,9 @@ class FcmReceiver:
             # Convert to hex string
             hex_string = binascii.hexlify(decoded_bytes).decode('utf-8')
 
-            for callback in self.location_update_callbacks:
+            with self._callbacks_lock:
+                callbacks = list(self.location_update_callbacks)
+            for callback in callbacks:
                 callback(hex_string)
         else:
             print("[FCMReceiver] Payload not found in the notification.")

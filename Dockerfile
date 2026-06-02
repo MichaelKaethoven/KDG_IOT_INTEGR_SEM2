@@ -21,6 +21,10 @@ USER appuser
 # Auth/secrets.json must be mounted at runtime — never bake credentials into the image
 VOLUME ["/app/libs/Auth"]
 
+# Unbuffered stdout/stderr so the polling loop's print()s ([poll], [mqtt] published
+# N, [fetch] timeout ...) reach Fly logs in real time instead of being stuck in
+# Python's block buffer — without this the pipeline is effectively unobservable.
+ENV PYTHONUNBUFFERED=1
 ENV POLL_INTERVAL=300
 ENV LOCATION_BATCH_SIZE=8
 ENV LOCATION_BATCH_DELAY=2.0

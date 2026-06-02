@@ -39,11 +39,15 @@ def fetch_locations_for_device(canonic_id: str, name: str, timeout: int = 30) ->
             result = device_update
             done.set()
 
-    fcm_token = FcmReceiver().register_for_location_updates(handle_response)
-    hex_payload = create_location_request(canonic_id, fcm_token, request_uuid)
-    nova_request(NOVA_ACTION_API_SCOPE, hex_payload)
+    receiver = FcmReceiver()
+    fcm_token = receiver.register_for_location_updates(handle_response)
+    try:
+        hex_payload = create_location_request(canonic_id, fcm_token, request_uuid)
+        nova_request(NOVA_ACTION_API_SCOPE, hex_payload)
 
-    done.wait(timeout=timeout)
+        done.wait(timeout=timeout)
+    finally:
+        receiver.unregister_for_location_updates(handle_response)
 
     if result is None:
         print(f"[fetch] timeout waiting for location response for {name}")
