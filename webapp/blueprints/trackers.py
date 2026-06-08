@@ -134,8 +134,10 @@ def edit_tracker(tracker_id):
     db = get_db()
     tracker = db.table("trackers").select("*").eq("id", tracker_id).single().execute().data
     if request.method == "POST":
+        # device_name is intentionally not editable here: it is synced from
+        # Google Find Hub (matched on serial_number/canonic_id) and is the join
+        # key for location data. Rename in Find Hub + "Sync from Google" instead.
         db.table("trackers").update({
-            "device_name": request.form["device_name"],
             "serial_number": request.form.get("serial_number") or None,
             "notes": request.form.get("notes") or None,
         }).eq("id", tracker_id).execute()

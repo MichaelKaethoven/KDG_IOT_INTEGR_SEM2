@@ -17,10 +17,23 @@
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
-        <label for="device_name" class="form-label">Device name <span class="text-danger">*</span></label>
+        <label for="device_name" class="form-label">Device name{% if not tracker %} <span class="text-danger">*</span>{% endif %}</label>
+        {% if tracker %}
+        <input id="device_name" type="text" class="form-control font-monospace"
+               value="{{ tracker.device_name }}" readonly disabled>
+        <div class="form-text">
+          <i class="bi bi-info-circle"></i>
+          The name is synced from Google Find Hub and can't be edited here.
+          To rename a tracker, change it in
+          <a href="https://www.google.com/android/find" target="_blank" rel="noopener">Google Find Hub</a>,
+          then press <strong>Sync from Google</strong> on the
+          <a href="{{ url_for('trackers.list_trackers') }}">Trackers</a> list.
+        </div>
+        {% else %}
         <input id="device_name" type="text" name="device_name" class="form-control font-monospace"
-               value="{{ tracker.device_name if tracker else '' }}" required
+               value="" required
                placeholder="Matches the name in device_locations">
+        {% endif %}
       </div>
       <div class="mb-3">
         <label for="serial_number" class="form-label">Serial number</label>
