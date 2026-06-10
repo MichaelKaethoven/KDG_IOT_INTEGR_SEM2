@@ -1,7 +1,9 @@
 import os
+import sys
 import json
 import time
 import hmac
+import logging
 import threading
 import argparse
 
@@ -10,6 +12,22 @@ from flask import Flask, jsonify, request
 
 from location_fetcher import fetch_all_locations, fetch_device_list
 from settings import load_runtime_settings
+
+# Route the firebase_messaging FCM client's logging to stdout. Our own pipeline
+# uses print() (unbuffered via the Dockerfile's PYTHONUNBUFFERED), but the FCM
+# library reports connection resets, reconnects, login success and — crucially —
+# its terminal "Shutting down push receiver" via logging.*, which has no handler
+# by default. Without this the FCM channel is a black box: a silent shutdown
+# (the 06-05 outage) looks identical to a working listener until every location
+# request starts timing out. Scope it to the library logger so we don't pull in
+# noise from paho/aiohttp/urllib3 at INFO.
+_fcm_log_handler = logging.StreamHandler(sys.stdout)
+_fcm_log_handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+)
+_fcm_logger = logging.getLogger("firebase_messaging")
+_fcm_logger.addHandler(_fcm_log_handler)
+_fcm_logger.setLevel(logging.INFO)
 
 app = Flask(__name__)
 

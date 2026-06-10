@@ -1,0 +1,166 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 16, "w": 16, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "basemap": { "config": {}, "name": "Layer 0", "type": "default" },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": { "field": "source", "fixed": "dark-green" },
+                "size": { "fixed": 8 },
+                "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" }
+              }
+            },
+            "location": { "latitude": "lat", "longitude": "lon", "mode": "coords" },
+            "name": "Assets",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": { "mode": "details" },
+        "view": { "id": "coords", "lat": 50.85, "lon": 4.35, "zoom": 8 }
+      },
+      "title": "Asset locations (GNSS + fallback)",
+      "type": "geomap",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT time AS \"time\", device_name, source, lat, lon, accuracy\nFROM device_locations\nWHERE $__timeFilter(time) AND lat IS NOT NULL AND source IS NOT NULL\nORDER BY time"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "percent",
+          "max": 100,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "id": 2,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "Battery %",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time AS \"time\", battery_pct AS value, device_name AS metric\nFROM device_locations\nWHERE $__timeFilter(time) AND battery_pct IS NOT NULL\nORDER BY time"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "mvolt"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "id": 3,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "Battery voltage (mV)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time AS \"time\", battery_mv AS value, device_name AS metric\nFROM device_locations\nWHERE $__timeFilter(time) AND battery_mv IS NOT NULL\nORDER BY time"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percent",
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "green", "value": 50 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 16, "x": 0, "y": 16 },
+      "id": 4,
+      "options": {
+        "orientation": "horizontal",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "title": "Battery now (latest per device)",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "supabase-postgres" },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT device_name, battery_pct\nFROM latest_device_locations\nWHERE battery_pct IS NOT NULL\nORDER BY device_name"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["walter", "poc"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Smeyers Asset Tracker — PoC",
+  "uid": "walter-poc",
+  "version": 4
+}

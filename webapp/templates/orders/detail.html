@@ -132,7 +132,7 @@
             <td>{{ a.tracker.serial_number or '—' }}</td>
             <td>{{ fmt_datetime(a.last_location.time) if a.last_location else '—' }}</td>
             <td>
-              {% if a.last_location %}
+              {% if a.last_location and a.last_location.lat is not none %}
                 {{ '%.5f' | format(a.last_location.lat) }}, {{ '%.5f' | format(a.last_location.lon) }}
               {% else %}—{% endif %}
             </td>

@@ -3,7 +3,12 @@ import base64
 import binascii
 import threading
 
-from Auth.firebase_messaging import FcmRegisterConfig, FcmPushClient
+from Auth.firebase_messaging import (
+    FcmRegisterConfig,
+    FcmPushClient,
+    FcmPushClientConfig,
+    FcmPushClientRunState,
+)
 from Auth.token_cache import set_cached_value, get_cached_value
 
 class FcmReceiver:
@@ -36,7 +41,7 @@ class FcmReceiver:
         android_cert_sha1 = "38918a453d07199354f8b19af05ec6562ced5788"
         bundle_id = "com.google.android.apps.adm"
 
-        fcm_config = FcmRegisterConfig(
+        self._fcm_config = FcmRegisterConfig(
             project_id=project_id,
             app_id=app_id,
             api_key=api_key,
@@ -46,27 +51,85 @@ class FcmReceiver:
             android_cert_sha1=android_cert_sha1
         )
 
+        # Keep the push client reconnecting through transient FCM/MCS outages
+        # instead of self-terminating. With the library default
+        # (abort_on_sequential_error_count=3) three sequential read/connection
+        # errors permanently shut the listener down; FcmReceiver then never knew
+        # to restart it, so every location request timed out forever and all
+        # trackers went stale. None = keep resetting; the higher retry count
+        # rides out longer blips before _reset gives up.
+        self._push_config = FcmPushClientConfig(
+            abort_on_sequential_error_count=None,
+            connection_retry_count=10,
+        )
+
         self.credentials = get_cached_value('fcm_credentials')
         self.location_update_callbacks = []
         self._callbacks_lock = threading.Lock()
-        self.pc = FcmPushClient(self._on_notification, fcm_config, self.credentials, self._on_credentials_updated)
+        self.pc = self._build_push_client()
+
+
+    def _build_push_client(self):
+        return FcmPushClient(
+            self._on_notification,
+            self._fcm_config,
+            self.credentials,
+            self._on_credentials_updated,
+            config=self._push_config,
+        )
+
+
+    def _client_terminated(self):
+        # The push client only reaches STOPPING/STOPPED via stop() or its own
+        # _terminate() after a terminal error — never during normal startup
+        # (CREATED -> STARTING_* -> STARTED), so this is a safe "is it dead?"
+        # signal that won't false-trigger a restart while it is still connecting.
+        return self.pc is not None and self.pc.run_state in (
+            FcmPushClientRunState.STOPPING,
+            FcmPushClientRunState.STOPPED,
+        )
+
+
+    def _teardown_dead_listener(self):
+        # The dead client's listen/monitor tasks were cancelled and cannot be
+        # revived, so stop its background loop and build a fresh client to start
+        # cleanly on a new loop.
+        self._listening = False
+        old_loop = self._loop
+        if old_loop and old_loop.is_running():
+            old_loop.call_soon_threadsafe(old_loop.stop)
+        self._loop = None
+        self._loop_thread = None
+        self.pc = self._build_push_client()
 
 
     def register_for_location_updates(self, callback):
-        # The FCM listener is a single shared connection. Start it exactly once,
-        # even when many device-location requests register concurrently: starting
-        # it more than once spawns multiple readers on the same socket and corrupts
-        # the connection ("readexactly() called while another coroutine is already
-        # waiting for incoming data"), after which every location request times out.
-        if not self._listening:
-            with self._start_lock:
-                if not self._listening:
-                    self._start_listener_in_background()
+        self._ensure_listening()
 
         with self._callbacks_lock:
             self.location_update_callbacks.append(callback)
 
         return self.credentials['fcm']['registration']['token']
+
+
+    def _ensure_listening(self):
+        # The FCM listener is a single shared connection. Start it exactly once,
+        # even when many device-location requests register concurrently: starting
+        # it more than once spawns multiple readers on the same socket and corrupts
+        # the connection ("readexactly() called while another coroutine is already
+        # waiting for incoming data"), after which every location request times out.
+        # We must also restart it if the underlying push client has terminated;
+        # otherwise a single terminal FCM error silently stops all location
+        # updates and every request times out indefinitely.
+        if self._listening and not self._client_terminated():
+            return
+
+        with self._start_lock:
+            if self._listening and not self._client_terminated():
+                return
+            if self._client_terminated():
+                self._teardown_dead_listener()
+            self._start_listener_in_background()
 
 
     def unregister_for_location_updates(self, callback):

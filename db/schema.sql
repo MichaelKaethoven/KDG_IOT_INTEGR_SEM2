@@ -86,6 +86,12 @@ create table if not exists device_locations (
     -- Google's reported fix time. The subscriber upserts with
     -- on_conflict="device_name,time", so this pair MUST stay unique.
     time        timestamptz,
+    -- Walter PoC asset-tracker fields (see db/migrations/008). NULL for Google
+    -- trackers; the Walter resolver fills them in. source = gnss|wifi|cell|none.
+    source      text,
+    sats        integer,
+    battery_mv  integer,
+    battery_pct integer,
     unique (device_name, time)
 );
 create index if not exists device_locations_device_time_idx
@@ -95,7 +101,8 @@ create index if not exists device_locations_device_time_idx
 -- table on list views so it doesn't drag the full history into memory.
 create or replace view latest_device_locations as
 select distinct on (device_name)
-    device_name, time, lat, lon, accuracy
+    device_name, time, lat, lon, accuracy,
+    source, sats, battery_mv, battery_pct
 from device_locations
 order by device_name, time desc;
 

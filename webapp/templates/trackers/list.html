@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import fmt_datetime %}
+{% from "_macros.html" import fmt_datetime, battery_badge %}
 {% block title %}Trackers{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -42,6 +42,7 @@
           <th scope="col">Status</th>
           <th scope="col">With customer</th>
           <th scope="col">In order</th>
+          <th scope="col">Battery</th>
           <th scope="col">Last seen at</th>
           <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
@@ -77,6 +78,7 @@
                 {{ t.assignment.id[:8] }}…</a>
             {% else %}—{% endif %}
           </td>
+          <td>{{ battery_badge(t.battery_pct) }}</td>
           <td>
             {% if t.last_seen %}
               {{ fmt_datetime(t.last_seen) }}
@@ -108,7 +110,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-muted text-center py-3">
+        <tr><td colspan="8" class="text-muted text-center py-3">
           {% if show_stale_only %}No stale trackers — everything has pinged within {{ stale_hours }}h.{% else %}No trackers in inventory.{% endif %}
         </td></tr>
         {% endfor %}

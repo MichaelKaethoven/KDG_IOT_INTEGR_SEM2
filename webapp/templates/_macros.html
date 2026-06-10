@@ -22,6 +22,17 @@
 <small>{{ done }}/{{ total }}</small>
 {%- endmacro %}
 
+{# Battery level pill. `pct` is 0–100 or None. None renders a muted "—" because
+   only the Walter PoC reports battery; Google trackers leave it NULL.
+   Colour: red < 20, amber < 50, green otherwise. #}
+{% macro battery_badge(pct) -%}
+{% if pct is none %}<span class="text-muted">—</span>
+{%- else -%}
+{% set cls = 'bg-danger' if pct < 20 else ('bg-warning text-dark' if pct < 50 else 'bg-success') %}
+<span class="badge {{ cls }}"><i class="bi bi-battery{{ '' if pct < 20 else ('-half' if pct < 70 else '-full') }}"></i> {{ pct }}%</span>
+{%- endif %}
+{%- endmacro %}
+
 {# Render an ISO timestamp as "YYYY-MM-DD HH:MM:SS UTC". Backend stores UTC. #}
 {% macro fmt_datetime(value, fallback='—') -%}
 {% if value %}{{ value[:19].replace('T',' ') }} <span class="text-muted small">UTC</span>{% else %}{{ fallback }}{% endif %}

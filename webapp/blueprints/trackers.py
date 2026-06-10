@@ -78,23 +78,26 @@ def list_trackers():
     # SQL). Avoids dragging the full device_locations history through the wire
     # just to keep the newest per device. See db/migrations/006.
     device_names = [t["device_name"] for t in trackers]
-    last_seen: dict = {}
+    latest: dict = {}
     if device_names:
         locs = (
             db.table("latest_device_locations")
-            .select("device_name, time")
+            .select("device_name, time, battery_pct")
             .in_("device_name", device_names)
             .execute()
             .data
         )
         for row in locs:
-            last_seen[row["device_name"]] = row["time"]
+            latest[row["device_name"]] = row
 
     stale_hours = get_setting("tracker_stale_hours")
     cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
     for tracker in trackers:
+        loc = latest.get(tracker["device_name"]) or {}
         tracker["assignment"] = assignment_map.get(tracker["id"])
-        tracker["last_seen"] = last_seen.get(tracker["device_name"])
+        tracker["last_seen"] = loc.get("time")
+        # battery_pct is NULL for Google trackers (only the Walter PoC reports it).
+        tracker["battery_pct"] = loc.get("battery_pct")
         tracker["stale"] = _is_stale(tracker["last_seen"], cutoff)
 
     stale_count = sum(1 for t in trackers if t["stale"])
@@ -150,7 +153,22 @@ def edit_tracker(tracker_id):
         .execute()
         .data
     )
-    return render_template("trackers/form.html", tracker=tracker, notes=notes)
+    # Latest fix for the battery/telemetry panel. NULL battery columns mean a
+    # Google tracker (no battery telemetry); only the Walter PoC reports them.
+    latest = (
+        db.table("latest_device_locations")
+        .select("time, source, sats, battery_mv, battery_pct")
+        .eq("device_name", tracker["device_name"])
+        .limit(1)
+        .execute()
+        .data
+    )
+    return render_template(
+        "trackers/form.html",
+        tracker=tracker,
+        notes=notes,
+        latest=latest[0] if latest else None,
+    )
 
 
 @trackers_bp.route("/<tracker_id>/notes", methods=["POST"])
