@@ -6,7 +6,7 @@
   "timezone": "browser",
   "refresh": "1m",
   "schemaVersion": 39,
-  "version": 8,
+  "version": 9,
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
     "list": [
@@ -181,14 +181,14 @@
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n  dl.battery_pct AS battery_pct,\n  c.name AS customer_name,\n  COALESCE(c.color_idx, 0) AS customer_color_idx,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'current'\nORDER BY dl.device_name, dl.time DESC"
+          "rawSql": "SELECT DISTINCT ON (dl.device_name)\n  dl.device_name,\n  dl.lat,\n  dl.lon,\n  dl.time AS last_seen,\n  ROUND((EXTRACT(EPOCH FROM (NOW() - dl.time)) / 3600.0)::numeric, 1) AS hours_since_seen,\n  dl.battery_pct AS battery_pct,\n  c.name AS customer_name,\n  COALESCE(c.color_idx, 0) AS customer_color_idx,\n  o.status AS order_status\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND dl.lat IS NOT NULL AND dl.lon IS NOT NULL\n  AND '${view}' = 'current'\nORDER BY dl.device_name, dl.time DESC"
         },
         {
           "refId": "B",
           "datasource": { "type": "postgres", "uid": "supabase-postgres" },
           "rawQuery": true,
           "format": "table",
-          "rawSql": "SELECT\n  dl.time,\n  dl.lat,\n  dl.lon,\n  dl.device_name,\n  c.name AS customer_name,\n  COALESCE(c.color_idx, 0) AS customer_color_idx\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND '${view}' = 'historical'\n  AND $__timeFilter(dl.time)\nORDER BY dl.time ASC"
+          "rawSql": "SELECT\n  dl.time,\n  dl.lat,\n  dl.lon,\n  dl.device_name,\n  c.name AS customer_name,\n  COALESCE(c.color_idx, 0) AS customer_color_idx\nFROM device_locations dl\nJOIN trackers t ON t.device_name = dl.device_name\nJOIN order_trackers ot ON ot.tracker_id = t.id AND ot.removed_at IS NULL\nJOIN orders o ON o.id = ot.order_id\nJOIN customers c ON c.id = o.customer_id\nWHERE ('${customer}' = 'all' OR c.id::text = '${customer}')\n  AND ('${order_var}' = 'all' OR o.id::text = '${order_var}')\n  AND ('${tracker}' = 'all' OR dl.device_name = '${tracker}')\n  AND dl.lat IS NOT NULL AND dl.lon IS NOT NULL\n  AND '${view}' = 'historical'\n  AND $__timeFilter(dl.time)\nORDER BY dl.time ASC"
         }
       ]
     },
